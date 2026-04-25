@@ -2,460 +2,1480 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="theme-color" content="#fafaf8"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="description" content="Track your subscriptions — renewals, costs, and savings at a glance."/>
 <title>SubTracker</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#fafaf8;--sf:#fff;--bd:#e8e6e1;--tx:#141412;--mt:#8a877f;
-  --ac:#141412;--rd:#d94f4f;--am:#c48a1a;--gn:#2d8a4e;--bl:#2a6cb6;
-  --r:12px;--serif:'Instrument Serif',Georgia,serif;
-  --mono:'Geist Mono',monospace;--sans:'Outfit',system-ui,sans-serif;
+/* ─── Tokens ────────────────────────────────────────────────────────────── */
+:root {
+  --cream:   #fafaf8;
+  --cream2:  #f3f2ee;
+  --cream3:  #eae8e1;
+  --ink:     #141412;
+  --ink2:    #3a3932;
+  --ink3:    #7a7870;
+  --accent:  #141412;
+  --red:     #c0392b;
+  --amber:   #b8860b;
+  --green:   #2d6a4f;
+  --blue:    #1a3a6b;
+  --serif:   'Instrument Serif', Georgia, serif;
+  --mono:    'Geist Mono', 'Courier New', monospace;
+  --sans:    'Outfit', sans-serif;
+  --radius:  14px;
+  --shadow:  0 1px 3px rgba(20,20,18,.08), 0 4px 12px rgba(20,20,18,.04);
+  --shadow-md: 0 2px 8px rgba(20,20,18,.1), 0 8px 24px rgba(20,20,18,.06);
 }
-html{height:100%;-webkit-font-smoothing:antialiased}
-body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100%;line-height:1.5}
-#app{max-width:480px;margin:0 auto;padding:0 20px 120px}
 
-/* Header */
-header{padding:max(env(safe-area-inset-top),20px) 0 24px;padding-top:max(env(safe-area-inset-top),48px);display:flex;align-items:baseline;justify-content:space-between}
-h1{font-family:var(--serif);font-size:32px;font-weight:400;letter-spacing:-.5px}
-.ha{display:flex;gap:6px}
-.hb{width:36px;height:36px;border-radius:50%;border:1px solid var(--bd);background:var(--sf);color:var(--tx);cursor:pointer;display:grid;place-items:center;font-size:14px;transition:.15s}
-.hb:hover{background:var(--ac);color:var(--bg);border-color:var(--ac)}
+/* ─── Reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--cream);
+  color: var(--ink);
+  min-height: 100dvh;
+  overscroll-behavior: none;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, select, textarea { font-family: inherit; }
 
-/* Scan */
-#scan{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--bd);border-radius:var(--r);margin-bottom:24px;background:var(--sf)}
-.sdot{width:8px;height:8px;border-radius:50%;background:var(--gn);flex-shrink:0;animation:pul 2s infinite}
-@keyframes pul{0%,100%{opacity:1}50%{opacity:.3}}
-#scan p{flex:1;font-size:13px;color:var(--mt)}
-#scan p b{color:var(--tx);font-weight:500}
-#sbtn{background:var(--ac);color:var(--bg);border:none;font-family:var(--sans);font-size:12px;font-weight:500;padding:7px 16px;border-radius:20px;cursor:pointer;letter-spacing:.3px;transition:.15s}
-#sbtn:hover{opacity:.8}
-#sbtn:disabled{opacity:.35;cursor:not-allowed}
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 0 96px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
 
-/* Progress */
-#prog{display:none;text-align:center;padding:20px;margin-bottom:24px;border:1px solid var(--bd);border-radius:var(--r);background:var(--sf)}
-#prog.on{display:block}
-.pb{height:2px;background:var(--bd);border-radius:2px;overflow:hidden;margin-top:10px}
-.pf{height:100%;background:var(--ac);border-radius:2px;transition:width .4s;width:0%}
-#pmsg{font-family:var(--mono);font-size:11px;color:var(--mt)}
+/* ─── Header ────────────────────────────────────────────────────────────── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(250,250,248,.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--cream3);
+  padding: 16px 20px 12px;
+}
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wordmark {
+  font-family: var(--serif);
+  font-size: 22px;
+  letter-spacing: -.3px;
+  color: var(--ink);
+  line-height: 1;
+}
+.wordmark em {
+  font-style: italic;
+  color: var(--ink3);
+}
+.header-actions { display: flex; gap: 6px; align-items: center; }
+.icon-btn {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 18px;
+  transition: background .15s;
+  color: var(--ink);
+}
+.icon-btn:hover { background: var(--cream3); }
 
-/* Notif */
-#nbar{display:none;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--bd);border-radius:var(--r);margin-bottom:20px;background:var(--sf);font-size:12px;color:var(--mt)}
-#nbar button{margin-left:auto;background:var(--ac);border:none;color:var(--bg);font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer}
+/* ─── Stats bar ─────────────────────────────────────────────────────────── */
+.stats-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--cream3);
+  border-bottom: 1px solid var(--cream3);
+}
+.stat-cell {
+  background: var(--cream);
+  padding: 14px 12px 12px;
+  text-align: center;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  display: block;
+  letter-spacing: -.5px;
+}
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink3);
+  margin-top: 2px;
+  display: block;
+}
 
-/* Summary */
-.sum{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:28px}
-.st{background:var(--sf);padding:16px 12px;text-align:center}
-.sv{font-family:var(--mono);font-size:20px;font-weight:500;letter-spacing:-.5px}
-.sl{font-size:11px;color:var(--mt);margin-top:2px;letter-spacing:.5px;text-transform:uppercase}
+/* ─── Action strip ──────────────────────────────────────────────────────── */
+.action-strip {
+  display: flex;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--cream3);
+}
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all .15s;
+}
+.action-btn.primary {
+  background: var(--ink);
+  color: var(--cream);
+}
+.action-btn.primary:hover { background: var(--ink2); }
+.action-btn.secondary {
+  background: var(--cream2);
+  color: var(--ink);
+  border: 1px solid var(--cream3);
+}
+.action-btn.secondary:hover { background: var(--cream3); }
+.action-btn:disabled { opacity: .45; pointer-events: none; }
+.btn-icon { font-size: 15px; }
 
-/* Filters */
-.flt{display:flex;gap:6px;margin-bottom:20px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
-.flt::-webkit-scrollbar{display:none}
-.fc{padding:6px 14px;border-radius:20px;border:1px solid var(--bd);background:var(--sf);color:var(--mt);font-size:12px;cursor:pointer;white-space:nowrap;transition:.15s}
-.fc:hover{border-color:var(--mt)}
-.fc.on{background:var(--ac);border-color:var(--ac);color:var(--bg)}
+/* ─── Notification banner ───────────────────────────────────────────────── */
+.notif-bar {
+  margin: 0 20px 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--cream2);
+  border: 1px solid var(--cream3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+.notif-bar.hidden { display: none; }
+.notif-text { color: var(--ink2); flex: 1; }
+.notif-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: 6px;
+}
 
-/* Cards */
-.seclbl{font-family:var(--mono);font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
-.lst{display:flex;flex-direction:column;gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:24px}
-.cd{background:var(--sf);padding:16px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:.15s;position:relative}
-.cd:hover{background:#f5f5f2}
-.cd:active{background:#eeede8}
-.ci{width:40px;height:40px;border-radius:10px;background:var(--bg);display:grid;place-items:center;font-size:20px;flex-shrink:0;border:1px solid var(--bd)}
-.cn{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cm{font-family:var(--mono);font-size:11px;color:var(--mt);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.cr{text-align:right;flex-shrink:0}
-.ca{font-family:var(--mono);font-size:14px;font-weight:500}
-.cc{font-family:var(--mono);font-size:10px;color:var(--mt)}
-.cif{flex:1;min-width:0}
-.tg{display:inline-block;font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:4px;font-weight:500;letter-spacing:.3px}
-.tok{background:#e8f5ed;color:var(--gn)}.twn{background:#fdf3e0;color:var(--am)}
-.tug{background:#fde8e8;color:var(--rd)}.tex{background:#f0efec;color:var(--mt)}
-.tbu{background:#e8f0fa;color:var(--bl)}
-.cbar{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--bd)}
-.cbf{height:100%;transition:width .5s}
+/* ─── Install banner ────────────────────────────────────────────────────── */
+.install-bar {
+  margin: 8px 20px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--cream2);
+  border: 1px solid var(--cream3);
+  font-size: 13px;
+}
+.install-bar.hidden { display: none; }
+.install-bar-top {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.install-icon { font-size: 20px; }
+.install-title { font-weight: 600; font-size: 14px; }
+.install-sub { color: var(--ink3); font-size: 12px; }
+.install-btns { display: flex; gap: 8px; }
+.install-btn-yes {
+  padding: 7px 16px; background: var(--ink); color: var(--cream);
+  border-radius: 7px; font-size: 13px; font-weight: 500;
+}
+.install-btn-skip {
+  padding: 7px 16px; background: transparent; color: var(--ink3);
+  border-radius: 7px; font-size: 13px;
+}
 
-/* Empty */
-.emt{text-align:center;padding:48px 20px;border:1px dashed var(--bd);border-radius:var(--r)}
-.emt h3{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:6px}
-.emt p{font-size:13px;color:var(--mt);line-height:1.6}
+/* ─── Filters ───────────────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 7px;
+  padding: 12px 20px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.filters::-webkit-scrollbar { display: none; }
+.filter-chip {
+  white-space: nowrap;
+  padding: 6px 13px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--cream2);
+  color: var(--ink2);
+  border: 1px solid var(--cream3);
+  transition: all .15s;
+  flex-shrink: 0;
+}
+.filter-chip.active {
+  background: var(--ink);
+  color: var(--cream);
+  border-color: var(--ink);
+}
 
-/* FAB */
-.fab{position:fixed;bottom:28px;right:max(20px,calc(50% - 240px + 20px));width:52px;height:52px;border-radius:50%;background:var(--ac);border:none;color:var(--bg);font-size:24px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.15);display:grid;place-items:center;transition:.2s;z-index:100}
-.fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(0,0,0,.2)}
-.fab:active{transform:scale(.95)}
+/* ─── Alert strip ───────────────────────────────────────────────────────── */
+.alert-strip {
+  margin: 6px 20px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff8e1;
+  border: 1px solid #f0c040;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--amber);
+  font-weight: 500;
+}
+.alert-strip.hidden { display: none; }
 
-/* Overlays */
-.ov{position:fixed;inset:0;background:rgba(20,20,18,.4);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
-.ov.open{opacity:1;pointer-events:all}
-.sh{background:var(--bg);border-radius:20px 20px 0 0;padding:20px 20px 40px;width:100%;max-width:480px;transform:translateY(30px);transition:transform .3s cubic-bezier(.22,1,.36,1);max-height:92vh;overflow-y:auto}
-.ov.open .sh{transform:translateY(0)}
-.shh{width:32px;height:3px;background:var(--bd);border-radius:2px;margin:0 auto 16px}
-.sht{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:16px}
+/* ─── Card list ─────────────────────────────────────────────────────────── */
+.section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--ink3);
+  padding: 10px 20px 4px;
+  font-weight: 500;
+}
+.cards { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
 
-/* Form */
-.fg{display:grid;gap:12px}.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.ff{display:flex;flex-direction:column;gap:4px}
-.ff label{font-size:11px;color:var(--mt);letter-spacing:.5px;text-transform:uppercase}
-.ff input,.ff select{background:var(--sf);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-family:var(--mono);font-size:13px;padding:10px 12px;outline:none;transition:.15s;width:100%;appearance:none;-webkit-appearance:none}
-.ff input:focus,.ff select:focus{border-color:var(--ac)}
-.ff input::placeholder{color:#ccc}
-.eg{display:flex;gap:6px;flex-wrap:wrap}
-.eo{width:34px;height:34px;border-radius:8px;border:1px solid var(--bd);background:var(--sf);cursor:pointer;display:grid;place-items:center;font-size:17px;transition:.15s}
-.eo:hover,.eo.on{border-color:var(--ac);background:var(--bg)}
-.br{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-.bt{padding:12px;border-radius:10px;border:none;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
-.bp{background:var(--ac);color:var(--bg)}.bp:hover{opacity:.85}
-.bs{background:var(--sf);color:var(--tx);border:1px solid var(--bd)}.bs:hover{background:var(--bg)}
-.bd{background:var(--sf);color:var(--rd);border:1px solid #f0d0d0}
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--cream3);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  cursor: pointer;
+  transition: all .15s;
+  position: relative;
+  animation: slideIn .22s ease;
+}
+.card:hover { border-color: var(--ink3); box-shadow: var(--shadow-md); }
+.card.due-soon { border-left: 3px solid var(--amber); }
+.card.due-critical { border-left: 3px solid var(--red); }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
-/* Detail */
-.dh{display:flex;align-items:center;gap:14px;margin-bottom:20px}
-.di{width:52px;height:52px;border-radius:14px;background:var(--sf);border:1px solid var(--bd);display:grid;place-items:center;font-size:26px}
-.dn{font-family:var(--serif);font-size:24px;font-weight:400}
-.dc{font-family:var(--mono);font-size:11px;color:var(--mt)}
-.dg{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
-.dt{background:var(--sf);padding:14px}
-.dl{font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
-.dv{font-family:var(--mono);font-size:14px;font-weight:500}
+.card-icon {
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  background: var(--cream2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.card-body { flex: 1; min-width: 0; }
+.card-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+.card-cycle {
+  font-size: 11px;
+  background: var(--cream2);
+  color: var(--ink3);
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  letter-spacing: .02em;
+}
+.card-category {
+  font-size: 11px;
+  color: var(--ink3);
+}
+.card-date {
+  font-size: 11.5px;
+  color: var(--ink3);
+  margin-top: 2px;
+  font-family: var(--mono);
+}
+.card-date.warn { color: var(--amber); }
+.card-date.crit { color: var(--red); }
 
-/* Found */
-.fl{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
-.fi{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--sf);cursor:pointer;transition:.15s}
-.fi.sel{border-color:var(--ac);background:#f8f8f5}
-.fk{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--bd);display:grid;place-items:center;flex-shrink:0;font-size:10px;color:transparent;transition:.15s}
-.fi.sel .fk{background:var(--ac);border-color:var(--ac);color:var(--bg)}
-.fn{font-size:13px;font-weight:500}.fm{font-family:var(--mono);font-size:10px;color:var(--mt)}
-.fa{font-family:var(--mono);font-size:12px;font-weight:500;text-align:right;flex-shrink:0}
+.card-right { text-align: right; flex-shrink: 0; }
+.card-amount {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.card-mrp {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink3);
+  text-decoration: line-through;
+  margin-top: 1px;
+}
+.card-savings {
+  font-size: 10.5px;
+  color: var(--green);
+  font-weight: 600;
+  margin-top: 1px;
+}
+.card-bundled {
+  font-size: 10px;
+  color: var(--green);
+  background: #e8f5e9;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-top: 3px;
+  display: inline-block;
+}
 
-/* Toast */
-.toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--ac);color:var(--bg);border-radius:10px;padding:10px 18px;font-size:12px;font-weight:500;z-index:500;opacity:0;transition:.25s;white-space:nowrap;pointer-events:none}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* ─── Empty state ───────────────────────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 60px 30px;
+  display: none;
+}
+.empty.show { display: block; }
+.empty-emoji { font-size: 40px; margin-bottom: 14px; }
+.empty-title {
+  font-family: var(--serif);
+  font-size: 20px;
+  color: var(--ink2);
+  margin-bottom: 8px;
+}
+.empty-sub { font-size: 13.5px; color: var(--ink3); line-height: 1.5; }
 
-/* Install banner */
-#ibanner{display:none;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--bd);border-radius:var(--r);margin-bottom:20px;background:var(--sf)}
-#ibanner.vis{display:flex}
-#ibanner p{flex:1;font-size:12px;color:var(--mt);line-height:1.4}
-#ibanner p b{color:var(--tx);font-weight:500}
-#ibanner button{background:var(--ac);border:none;color:var(--bg);font-size:11px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;flex-shrink:0}
+/* ─── FAB ────────────────────────────────────────────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 40;
+  width: 56px; height: 56px;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  box-shadow: 0 4px 16px rgba(20,20,18,.25);
+  transition: transform .15s, box-shadow .15s;
+}
+.fab:hover { transform: scale(1.07); box-shadow: 0 6px 20px rgba(20,20,18,.3); }
+.fab:active { transform: scale(.96); }
 
-::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+/* ─── Modal backdrop ────────────────────────────────────────────────────── */
+.backdrop {
+  position: fixed; inset: 0;
+  background: rgba(20,20,18,.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  animation: fadeIn .2s ease;
+}
+.backdrop.show { display: flex; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--cream);
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 480px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  padding: 0 0 32px;
+  animation: slideUp .25s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.modal-handle {
+  width: 36px; height: 4px;
+  background: var(--cream3);
+  border-radius: 2px;
+  margin: 12px auto 16px;
+}
+.modal-title {
+  font-family: var(--serif);
+  font-size: 20px;
+  padding: 0 20px 12px;
+  border-bottom: 1px solid var(--cream3);
+}
+.modal-body { padding: 18px 20px 0; }
+
+/* ─── Form ───────────────────────────────────────────────────────────────── */
+.field { margin-bottom: 16px; }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--ink3);
+  margin-bottom: 5px;
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1.5px solid var(--cream3);
+  border-radius: 9px;
+  background: #fff;
+  font-size: 14.5px;
+  color: var(--ink);
+  transition: border-color .15s;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--ink);
+}
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.icon-picker {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.icon-pick {
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  border: 1.5px solid var(--cream3);
+  font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .12s;
+}
+.icon-pick:hover { border-color: var(--ink2); }
+.icon-pick.selected { border-color: var(--ink); background: var(--cream2); }
+
+.form-actions { display: flex; gap: 10px; margin-top: 20px; padding: 0 20px; }
+.btn-cancel {
+  flex: 1; padding: 12px;
+  border-radius: 10px;
+  font-size: 14px; font-weight: 500;
+  background: var(--cream2);
+  color: var(--ink2);
+  border: 1px solid var(--cream3);
+}
+.btn-save {
+  flex: 2; padding: 12px;
+  border-radius: 10px;
+  font-size: 14px; font-weight: 600;
+  background: var(--ink);
+  color: var(--cream);
+  transition: background .15s;
+}
+.btn-save:hover { background: var(--ink2); }
+
+/* ─── Detail modal ──────────────────────────────────────────────────────── */
+.detail-hero {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--cream3);
+}
+.detail-icon {
+  width: 52px; height: 52px;
+  border-radius: 13px;
+  background: var(--cream2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.detail-name {
+  font-family: var(--serif);
+  font-size: 22px;
+  color: var(--ink);
+}
+.detail-cat { font-size: 12.5px; color: var(--ink3); margin-top: 2px; }
+.detail-rows { padding: 14px 20px; display: flex; flex-direction: column; gap: 12px; }
+.detail-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--cream2);
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-key { font-size: 12.5px; color: var(--ink3); font-weight: 500; }
+.detail-val { font-size: 14px; color: var(--ink); font-family: var(--mono); font-weight: 500; }
+.detail-actions { display: flex; gap: 10px; padding: 4px 20px 0; }
+.btn-delete {
+  flex: 1; padding: 11px;
+  border-radius: 10px;
+  font-size: 13.5px; font-weight: 500;
+  background: #fff0ef;
+  color: var(--red);
+  border: 1px solid #ffd5d2;
+}
+.btn-edit {
+  flex: 2; padding: 11px;
+  border-radius: 10px;
+  font-size: 13.5px; font-weight: 600;
+  background: var(--ink); color: var(--cream);
+}
+
+/* ─── Toast ─────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--cream);
+  padding: 10px 20px; border-radius: 10px;
+  font-size: 13.5px; font-weight: 500;
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0; transition: opacity .2s;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* ─── Scan status ───────────────────────────────────────────────────────── */
+.scan-status {
+  margin: 6px 20px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #e8f4fd;
+  border: 1px solid #bee3f8;
+  font-size: 12.5px;
+  color: var(--blue);
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+.scan-status.show { display: flex; }
+.scan-spinner { animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<div id="app">
-  <header><h1>SubTracker</h1><div class="ha"><button class="hb" id="nbtn">🔔</button><button class="hb" id="sbrt">↕</button></div></header>
 
-  <div id="ibanner"><span style="font-size:22px">📲</span><p><b>Install SubTracker</b><br>Add to home screen for offline use &amp; reminders</p><button id="ibtn">Install</button></div>
+<div class="app">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-row">
+      <span class="wordmark">Sub<em>Tracker</em></span>
+      <div class="header-actions">
+        <button class="icon-btn" id="sortBtn" title="Sort" aria-label="Sort">⇅</button>
+        <button class="icon-btn" id="installIconBtn" title="Install app" aria-label="Install app" style="display:none">📲</button>
+      </div>
+    </div>
+  </header>
 
-  <div id="scan"><div class="sdot"></div><p><b>Gmail Scan</b> — detect subscriptions via AI</p><button id="sbtn">Scan</button></div>
-  <div id="prog"><div id="pmsg">Connecting…</div><div class="pb"><div class="pf" id="pf"></div></div></div>
-
-  <div id="nbar"><span>🔔</span><span>Get reminders 7 days before renewal</span><button id="enbtn">Enable</button></div>
-
-  <div class="sum">
-    <div class="st"><div class="sv" id="smo">₹0</div><div class="sl">Monthly</div></div>
-    <div class="st"><div class="sv" id="sdu">0</div><div class="sl">Due Soon</div></div>
-    <div class="st"><div class="sv" id="sct">0</div><div class="sl">Active</div></div>
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-cell">
+      <span class="stat-value" id="statMonthly">₹0</span>
+      <span class="stat-label">Monthly</span>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-value" id="statDueSoon">0</span>
+      <span class="stat-label">Due Soon</span>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-value" id="statActive">0</span>
+      <span class="stat-label">Active</span>
+    </div>
   </div>
 
-  <div class="flt" id="flt">
-    <div class="fc on" data-f="all">All</div>
-    <div class="fc" data-f="urgent">Due Soon</div>
-    <div class="fc" data-f="software">Software</div>
-    <div class="fc" data-f="streaming">Streaming</div>
-    <div class="fc" data-f="telecom">Telecom</div>
-    <div class="fc" data-f="fitness">Fitness</div>
-    <div class="fc" data-f="lifestyle">Lifestyle</div>
-    <div class="fc" data-f="other">Other</div>
+  <!-- ACTIONS -->
+  <div class="action-strip">
+    <button class="action-btn secondary" id="scanBtn">
+      <span class="btn-icon">⦿</span> Gmail Scan
+    </button>
+    <button class="action-btn primary" id="notifBtn">
+      <span class="btn-icon">🔔</span> Reminders
+    </button>
   </div>
 
-  <div id="usec" style="display:none"><div class="seclbl">⚠ Renewing within 7 days</div><div class="lst" id="ulst"></div></div>
-  <div class="seclbl">Subscriptions</div>
-  <div class="lst" id="slst"><div class="emt" id="emt"><h3>No subscriptions yet</h3><p>Tap Scan to detect from Gmail, or + to add manually.</p></div></div>
+  <!-- INSTALL BANNER -->
+  <div class="install-bar hidden" id="installBar">
+    <div class="install-bar-top">
+      <span class="install-icon">📲</span>
+      <div>
+        <div class="install-title">Install SubTracker</div>
+        <div class="install-sub">Add to home screen for offline use &amp; reminders</div>
+      </div>
+    </div>
+    <div class="install-btns">
+      <button class="install-btn-yes" id="installBtn">Install</button>
+      <button class="install-btn-skip" id="installSkip">Skip</button>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION BAR (shown if not yet granted) -->
+  <div class="notif-bar hidden" id="notifBar">
+    <span class="notif-text">🔔 Get reminders 7 days before renewal</span>
+    <button class="notif-btn" id="notifEnable">Enable</button>
+  </div>
+
+  <!-- SCAN STATUS -->
+  <div class="scan-status" id="scanStatus">
+    <span class="scan-spinner">⏳</span>
+    <span id="scanStatusText">Scanning emails…</span>
+  </div>
+
+  <!-- ALERT STRIP (due soon) -->
+  <div class="alert-strip hidden" id="alertStrip">
+    ⚠ Renewing within 7 days
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters" id="filters">
+    <button class="filter-chip active" data-filter="All">All</button>
+    <button class="filter-chip" data-filter="Due Soon">Due Soon</button>
+    <button class="filter-chip" data-filter="Software">Software</button>
+    <button class="filter-chip" data-filter="Streaming">Streaming</button>
+    <button class="filter-chip" data-filter="Telecom">Telecom</button>
+    <button class="filter-chip" data-filter="Fitness">Fitness</button>
+    <button class="filter-chip" data-filter="Lifestyle">Lifestyle</button>
+    <button class="filter-chip" data-filter="Other">Other</button>
+  </div>
+
+  <!-- SECTION LABEL + CARDS -->
+  <div class="section-label">Subscriptions</div>
+  <div class="cards" id="cards"></div>
+  <div class="empty" id="empty">
+    <div class="empty-emoji">🔭</div>
+    <div class="empty-title">No subscriptions yet</div>
+    <div class="empty-sub">Tap Scan to detect from Gmail, or + to add manually.</div>
+  </div>
 </div>
 
-<button class="fab" id="fab">+</button>
+<!-- FAB -->
+<button class="fab" id="fab" aria-label="Add subscription">+</button>
+
+<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<div class="ov" id="fov"><div class="sh"><div class="shh"></div><div class="sht" id="ftit"></div><p id="fsub" style="font-size:12px;color:var(--mt);margin-bottom:14px"></p><div class="fl" id="flst"></div><div class="br"><button class="bt bs" id="fskip">Skip</button><button class="bt bp" id="fimp">Import</button></div></div></div>
-
-<div class="ov" id="aov"><div class="sh"><div class="shh"></div><div class="sht" id="mtit">Add Subscription</div>
-<div class="fg">
-  <div class="ff"><label>Name</label><input id="fn" placeholder="Netflix, Spotify…"/></div>
-  <div class="ff"><label>Icon</label><div class="eg" id="feg"></div></div>
-  <div class="fr"><div class="ff"><label>Amount Paid (₹)</label><input type="number" id="fam" placeholder="0 = free/bundled"/></div><div class="ff"><label>MRP (₹, optional)</label><input type="number" id="fmr" placeholder="Original price"/></div></div>
-  <div class="ff"><label>Cycle</label><select id="fcy"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="half-yearly">Half-Yearly</option><option value="yearly">Yearly</option></select></div>
-  <div class="fr"><div class="ff"><label>Start Date</label><input type="date" id="fsd"/></div><div class="ff"><label>Renewal / Expiry</label><input type="date" id="frd"/></div></div>
-  <div class="ff"><label>Category</label><select id="fca"><option value="software">Software</option><option value="streaming">Streaming</option><option value="telecom">Telecom</option><option value="fitness">Fitness</option><option value="lifestyle">Lifestyle</option><option value="news">News</option><option value="other">Other</option></select></div>
-  <div class="ff"><label>Bundled via (optional)</label><input id="fbu" placeholder="e.g. Airtel, Flipkart BLACK"/></div>
-  <div class="ff"><label>Notes</label><input id="fno" placeholder="Family plan, annual…"/></div>
+<!-- ADD/EDIT MODAL -->
+<div class="backdrop" id="addBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Add Subscription">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="addModalTitle">Add Subscription</div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="fName" placeholder="e.g. Netflix"/>
+      </div>
+      <div class="field">
+        <label>Icon</label>
+        <div class="icon-picker" id="iconPicker"></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Amount Paid (₹)</label>
+          <input type="number" id="fAmount" placeholder="0" min="0" step="0.01"/>
+        </div>
+        <div class="field">
+          <label>MRP (₹, optional)</label>
+          <input type="number" id="fMrp" placeholder="0" min="0" step="0.01"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Cycle</label>
+        <select id="fCycle">
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="half-yearly">Half-Yearly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Start / Last Paid</label>
+          <input type="date" id="fStart"/>
+        </div>
+        <div class="field">
+          <label>Renewal / Expiry</label>
+          <input type="date" id="fEnd"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="fCat">
+          <option value="Software">Software</option>
+          <option value="Streaming">Streaming</option>
+          <option value="Telecom">Telecom</option>
+          <option value="Fitness">Fitness</option>
+          <option value="Lifestyle">Lifestyle</option>
+          <option value="News">News</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Bundled via (optional)</label>
+        <input type="text" id="fBundled" placeholder="e.g. Airtel, Flipkart BLACK"/>
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="fNotes" rows="2" placeholder="Optional notes…" style="resize:none"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="addCancel">Cancel</button>
+      <button class="btn-save" id="addSave">Save</button>
+    </div>
+  </div>
 </div>
-<div class="br"><button class="bt bs" id="canb">Cancel</button><button class="bt bp" id="savb">Save</button></div>
-</div></div>
 
-<div class="ov" id="dov"><div class="sh"><div class="shh"></div><div id="dc"></div></div></div>
+<!-- DETAIL MODAL -->
+<div class="backdrop" id="detailBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Subscription Detail">
+    <div class="modal-handle"></div>
+    <div class="detail-hero">
+      <div class="detail-icon" id="dIcon"></div>
+      <div>
+        <div class="detail-name" id="dName"></div>
+        <div class="detail-cat" id="dCat"></div>
+      </div>
+    </div>
+    <div class="detail-rows" id="dRows"></div>
+    <div class="detail-actions">
+      <button class="btn-delete" id="dDelete">Delete</button>
+      <button class="btn-edit"   id="dEdit">Edit</button>
+    </div>
+  </div>
+</div>
 
 <script>
-/* ─── DB ─── */
-const DB='st-v4',VER=1;let db;
-const odb=()=>new Promise((r,j)=>{const q=indexedDB.open(DB,VER);q.onupgradeneeded=e=>{if(!e.target.result.objectStoreNames.contains('s'))e.target.result.createObjectStore('s',{keyPath:'id'})};q.onsuccess=e=>{db=e.target.result;r(db)};q.onerror=e=>j(e.target.error)});
-const ga=()=>new Promise((r,j)=>{const q=db.transaction('s','readonly').objectStore('s').getAll();q.onsuccess=e=>r(e.target.result);q.onerror=e=>j(e.target.error)});
-const put=s=>new Promise((r,j)=>{const q=db.transaction('s','readwrite').objectStore('s').put(s);q.onsuccess=e=>r(e.target.result);q.onerror=e=>j(e.target.error)});
-const del=id=>new Promise((r,j)=>{const q=db.transaction('s','readwrite').objectStore('s').delete(id);q.onsuccess=e=>r(e.target.result);q.onerror=e=>j(e.target.error)});
+/* ────────────────────────────────────────────────────────────────────────
+   CONFIG — Update PROXY_URL after deploying your Cloudflare Worker
+   ──────────────────────────────────────────────────────────────────────── */
+const PROXY_URL = 'https://subtracker-proxy.YOUR_SUBDOMAIN.workers.dev/v1/messages';
+// ↑ Replace with your actual worker URL after `wrangler deploy`
+// Format: https://<worker-name>.<your-cf-subdomain>.workers.dev/v1/messages
 
-let subs=[],editId=null,selE='📦',curF='all',sortM='renewal';
-let fCands=[],selF=new Set();
-const USD=84;
+/* ────────────────────────────────────────────────────────────────────────
+   ICONS
+   ──────────────────────────────────────────────────────────────────────── */
+const ICONS = ['🎬','🎵','🎮','📚','💪','☁️','🛒','📰','💼','✈️','🏠','🧘','📺','🧠','🖥️','📡','📱','🎧','🎨','🎨','🤖','⭐','🌳','🏠'];
 
-/* ─── Utils ─── */
-const fmt=n=>n===0?'Free':'₹'+Number(n).toLocaleString('en-IN');
-const tdy=()=>new Date(new Date().toDateString());
-const du=s=>Math.round((new Date(s)-tdy())/864e5);
-const tm=(a,c)=>a/({monthly:1,quarterly:3,'half-yearly':6,yearly:12}[c]||1);
-const st=s=>{const d=du(s.renewalDate);return d<0?'expired':d<=3?'urgent':d<=7?'warning':'ok'};
-const fd=s=>new Date(s).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
-function adv(d,c){const x=new Date(d);x.setMonth(x.getMonth()+({monthly:1,quarterly:3,'half-yearly':6,yearly:12}[c]||1));return x.toISOString().split('T')[0]}
-async function autoAdv(){for(const s of subs){if(s.endDate)continue;let i=0;while(du(s.renewalDate)<0&&i++<50)s.renewalDate=adv(s.renewalDate,s.cycle);await put(s)}}
-function pill(s,d){return s==='expired'?'<span class="tg tex">Expired</span>':s==='urgent'?`<span class="tg tug">${d}d left</span>`:s==='warning'?`<span class="tg twn">${d}d</span>`:`<span class="tg tok">${d}d</span>`}
-
-/* ─── Gmail data (12-month scan, corrected) ─── */
-const EMAILS=[
-  {subject:"Anthropic receipt",sender:"anthropic.com",date:"2026-04-24",body:"Claude Pro $20 GST $3.60 Total $23.60 monthly Apr15-May15 2026. Auto-renews."},
-  {subject:"Genspark receipt",sender:"stripe.com",date:"2026-02-11",body:"Genspark Plus $24.99 IGST $4.50 Total $29.49 monthly Feb11-Mar11 genspark.ai. Auto-renews."},
-  {subject:"Apple invoice",sender:"apple.com",date:"2026-03-18",body:"Apple recurring monthly subscription Mar 2026 UPI Bangalore. Auto-renews."},
-  {subject:"Airtel receipt",sender:"airtel.com",date:"2026-04-22",body:"Airtel Postpaid Rs 1178.82 monthly Apr 2026. Includes bundled Amazon Prime."},
-  {subject:"Apartment maintenance",sender:"apnacomplex.com",date:"2026-04-01",body:"Golden Star Apt G-103 Maintenance Collection Quarterly."},
-  {subject:"Google One renewal",sender:"google.com",date:"2025-11-23",body:"Google One 100GB renewed Nov 23 2025 Rs 1300/year. endDate: 2026-11-23."},
-  {subject:"Accor Plus renewal",sender:"accorplus.com",date:"2025-07-16",body:"Accor Plus annual membership renewed Jul 16 2025 ~Rs15000/yr. endDate: 2026-07-16."},
-  {subject:"Amazon Prime via Airtel",sender:"amazon.in",date:"2026-01-27",body:"Amazon Prime bundled with Airtel postpaid. Amount 0. Renewal managed by Airtel."},
-  {subject:"LinkedIn Premium",sender:"linkedin.com",date:"2025-11-11",body:"LinkedIn Premium Career purchased Nov 11 2025. Monthly ~Rs2650. Auto-renews."},
-  {subject:"PlayStation Plus",sender:"playstation.com",date:"2025-10-09",body:"PlayStation Plus activated Oct 2025. Monthly ~Rs499. Auto-renews."},
-  {subject:"Cult.fit Pro Plus",sender:"cult.fit",date:"2025-08-24",body:"Cult.fit 12 Months Pro Plus confirmed Aug 24 2025. Valid till 27 Aug 2026. endDate: 2026-08-27. Yearly. Fitness."},
-  {subject:"Flipkart BLACK",sender:"flipkart.com",date:"2026-01-19",body:"Flipkart BLACK Membership Jan 19 2026. Annual. endDate: 2027-01-19. Includes YouTube Premium."},
-  {subject:"YouTube Premium",sender:"flipkart.com",date:"2026-01-19",body:"YouTube Premium bundled with Flipkart BLACK. Amount 0. endDate: 2027-01-19. bundledVia Flipkart BLACK."}
+/* ────────────────────────────────────────────────────────────────────────
+   HARDCODED BAKED-IN SUBSCRIPTIONS  (from prior Gmail scan session)
+   ──────────────────────────────────────────────────────────────────────── */
+const SEED_SUBS = [
+  {
+    id: 'seed-claude-pro',
+    name: 'Claude Pro',
+    icon: '🤖',
+    amount: 1976,      // $23.60 at ~83.7 INR/USD
+    mrp: 0,
+    cycle: 'monthly',
+    lastPaidDate: '2026-04-15',
+    endDate: '2026-05-15',
+    category: 'Software',
+    source: 'seed',
+    bundledVia: '',
+    notes: '$23.60/mo · renews May 15 2026'
+  },
+  {
+    id: 'seed-genspark',
+    name: 'Genspark Plus',
+    icon: '⭐',
+    amount: 2468,      // $29.49
+    mrp: 0,
+    cycle: 'monthly',
+    lastPaidDate: '2026-03-11',
+    endDate: '2026-03-11',
+    category: 'Software',
+    source: 'seed',
+    bundledVia: '',
+    notes: '$29.49/mo · renews Mar 11 2026'
+  },
+  {
+    id: 'seed-apple',
+    name: 'Apple Subscription',
+    icon: '🍎',
+    amount: 0,
+    mrp: 0,
+    cycle: 'monthly',
+    lastPaidDate: '2026-03-18',
+    endDate: '2026-04-18',
+    category: 'Software',
+    source: 'seed',
+    bundledVia: '',
+    notes: 'Monthly · renews ~Apr 18 2026'
+  },
+  {
+    id: 'seed-airtel',
+    name: 'Airtel Postpaid',
+    icon: '📱',
+    amount: 1178,
+    mrp: 0,
+    cycle: 'monthly',
+    lastPaidDate: '2026-04-22',
+    endDate: '2026-05-22',
+    category: 'Telecom',
+    source: 'seed',
+    bundledVia: '',
+    notes: '₹1178/mo · renews ~May 22 2026'
+  },
+  {
+    id: 'seed-maintenance',
+    name: 'Apartment Maintenance',
+    icon: '🏠',
+    amount: 0,
+    mrp: 0,
+    cycle: 'quarterly',
+    lastPaidDate: '2026-01-01',
+    endDate: '2026-04-01',
+    category: 'Lifestyle',
+    source: 'seed',
+    bundledVia: '',
+    notes: 'Golden Star Apt · quarterly'
+  },
+  {
+    id: 'seed-google-one',
+    name: 'Google One 100GB',
+    icon: '☁️',
+    amount: 1300,
+    mrp: 0,
+    cycle: 'yearly',
+    lastPaidDate: '2025-11-23',
+    endDate: '2026-11-23',
+    category: 'Software',
+    source: 'seed',
+    bundledVia: '',
+    notes: '₹1300/yr'
+  },
+  {
+    id: 'seed-accor',
+    name: 'Accor Plus',
+    icon: '✈️',
+    amount: 15000,
+    mrp: 0,
+    cycle: 'yearly',
+    lastPaidDate: '2025-07-16',
+    endDate: '2026-07-16',
+    category: 'Lifestyle',
+    source: 'seed',
+    bundledVia: '',
+    notes: '~₹15000/yr · expires Jul 16 2026'
+  },
+  {
+    id: 'seed-amazon-prime',
+    name: 'Amazon Prime',
+    icon: '📦',
+    amount: 0,
+    mrp: 1499,
+    cycle: 'yearly',
+    lastPaidDate: '',
+    endDate: '',
+    category: 'Streaming',
+    source: 'seed',
+    bundledVia: 'Airtel',
+    notes: 'Free via Airtel Postpaid'
+  },
+  {
+    id: 'seed-linkedin',
+    name: 'LinkedIn Premium Career',
+    icon: '💼',
+    amount: 2650,
+    mrp: 0,
+    cycle: 'monthly',
+    lastPaidDate: '2025-11-11',
+    endDate: '',
+    category: 'Software',
+    source: 'seed',
+    bundledVia: '',
+    notes: '~₹2650/mo · started Nov 11 2025'
+  },
+  {
+    id: 'seed-ps-plus',
+    name: 'PlayStation Plus',
+    icon: '🎮',
+    amount: 499,
+    mrp: 0,
+    cycle: 'monthly',
+    lastPaidDate: '2025-10-09',
+    endDate: '',
+    category: 'Streaming',
+    source: 'seed',
+    bundledVia: '',
+    notes: '~₹499/mo · started Oct 9 2025'
+  },
+  {
+    id: 'seed-cult',
+    name: 'Cult.fit Pro Plus',
+    icon: '💪',
+    amount: 0,
+    mrp: 0,
+    cycle: 'yearly',
+    lastPaidDate: '2025-08-27',
+    endDate: '2026-08-27',
+    category: 'Fitness',
+    source: 'seed',
+    bundledVia: '',
+    notes: 'Yearly · expires Aug 27 2026'
+  },
+  {
+    id: 'seed-flipkart',
+    name: 'Flipkart BLACK',
+    icon: '🛒',
+    amount: 0,
+    mrp: 0,
+    cycle: 'yearly',
+    lastPaidDate: '2026-01-19',
+    endDate: '2027-01-19',
+    category: 'Lifestyle',
+    source: 'seed',
+    bundledVia: '',
+    notes: 'Yearly · expires Jan 19 2027'
+  },
+  {
+    id: 'seed-youtube',
+    name: 'YouTube Premium',
+    icon: '▶️',
+    amount: 0,
+    mrp: 1189,
+    cycle: 'yearly',
+    lastPaidDate: '',
+    endDate: '2027-01-19',
+    category: 'Streaming',
+    source: 'seed',
+    bundledVia: 'Flipkart BLACK',
+    notes: 'Free via Flipkart BLACK · expires Jan 19 2027'
+  },
 ];
 
-/* ─── Scan ─── */
-function sp(p,m){document.getElementById('pf').style.width=p+'%';document.getElementById('pmsg').textContent=m}
-async function runScan(){
-  const b=document.getElementById('sbtn'),pr=document.getElementById('prog'),sc=document.getElementById('scan');
-  b.disabled=true;b.textContent='Scanning…';sc.style.display='none';pr.classList.add('on');sp(10,'Fetching emails…');
-  try{
-    await new Promise(r=>setTimeout(r,300));
-    sp(40,`Parsing ${EMAILS.length} emails with AI…`);
-    const ext=await aiX(EMAILS);
-    sp(85,'Deduplicating…');
-    const fresh=ext.filter(c=>!subs.some(s=>s.name.toLowerCase().split(' ')[0]===c.name.toLowerCase().split(' ')[0]));
-    sp(100,`${fresh.length} new found`);
-    await new Promise(r=>setTimeout(r,600));
-    pr.classList.remove('on');
-    if(fresh.length>0)showFnd(fresh);
-    else{sc.style.display='flex';b.disabled=false;b.textContent='Rescan';toast(ext.length>0?'All subs already tracked ✓':'No new subs found')}
-  }catch(e){pr.classList.remove('on');sc.style.display='flex';b.disabled=false;b.textContent='Retry';toast('Error: '+(e.message||''));console.error(e)}
+/* ────────────────────────────────────────────────────────────────────────
+   HARDCODED EMAIL ARRAY  (paste Gmail scan data here — no live Gmail needed)
+   ──────────────────────────────────────────────────────────────────────── */
+const EMAILS = [
+  // { subject: '...', from: '...', date: '...', snippet: '...' },
+  // Add your email objects here. The AI will parse them into subscriptions.
+];
+
+/* ────────────────────────────────────────────────────────────────────────
+   DB
+   ──────────────────────────────────────────────────────────────────────── */
+let db;
+const DB_NAME = 'subtracker-v2';
+const STORE    = 'subs';
+
+async function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        d.createObjectStore(STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+async function dbGetAll() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+async function dbPut(item) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(item);
+    tx.oncomplete = () => res();
+    tx.onerror    = e => rej(e.target.error);
+  });
+}
+async function dbDelete(id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => res();
+    tx.onerror    = e => rej(e.target.error);
+  });
 }
 
-async function aiX(emails){
-  const td=new Date().toISOString().split('T')[0];
-  const prompt=`You are a subscription detector. Extract ALL recurring paid subscriptions AND bundled/complimentary services.
+/* ────────────────────────────────────────────────────────────────────────
+   STATE
+   ──────────────────────────────────────────────────────────────────────── */
+let subs = [];
+let activeFilter = 'All';
+let sortMode = 'date'; // 'date' | 'amount' | 'name'
+let editingId = null;
+let selectedIcon = '⭐';
+let deferredInstall = null;
 
-Today: ${td}. USD→INR: ${USD}.
+/* ────────────────────────────────────────────────────────────────────────
+   HELPERS
+   ──────────────────────────────────────────────────────────────────────── */
+function uid() { return 'sub-' + Date.now() + '-' + Math.random().toString(36).slice(2,7); }
 
-Return JSON array:
-[{"name":"","icon":"emoji","amount":<INR paid, 0 if bundled/free>,"mrp":<INR list price, 0 if unknown>,"cycle":"monthly|quarterly|half-yearly|yearly","lastPaidDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD or empty if auto-renewing","category":"software|streaming|telecom|fitness|lifestyle|other","source":"brief","bundledVia":"parent service or empty"}]
-
-Rules:
-- USD×${USD}, round to rupee
-- endDate: use if email says "valid till","expires","endDate:". For auto-renewing monthly subs leave empty.
-- If endDate is before today (${td}), EXCLUDE — already expired.
-- Bundled (Amazon Prime via Airtel, YouTube Premium via Flipkart BLACK): amount=0, set bundledVia
-- Flipkart BLACK: yearly, started Jan 19 2026, endDate=2027-01-19
-- YouTube Premium: bundledVia="Flipkart BLACK", endDate=2027-01-19
-- Cult.fit: email says valid till 27 Aug 2026. endDate=2026-08-27. yearly. fitness
-- Google One: endDate=2026-11-23. yearly
-- Accor Plus: endDate=2026-07-16. yearly
-- mrp=0 if unknown
-- EXCLUDE one-time purchases, food orders, flights, expired subs
-- Return ONLY JSON array.
-
-Emails: ${JSON.stringify(emails)}`;
-
-  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})});
-  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?.message||'API '+r.status)}
-  const d=await r.json();
-  const txt=d.content.filter(b=>b.type==='text').map(b=>b.text).join('').replace(/```json|```/g,'').trim();
-  let p;try{p=JSON.parse(txt)}catch{const m=txt.match(/\[[\s\S]*\]/);if(m)p=JSON.parse(m[0]);else throw new Error('Parse failed')}
-  return p.map(i=>({...i,id:'g-'+Date.now()+'-'+Math.random().toString(36).slice(2),startDate:i.lastPaidDate||td,renewalDate:i.endDate||(i.lastPaidDate?adv(i.lastPaidDate,i.cycle):td),endDate:i.endDate||'',fromGmail:true,bundledVia:i.bundledVia||'',mrp:i.mrp||0}));
+function toMonthly(amount, cycle) {
+  if (!amount) return 0;
+  const map = { monthly:1, quarterly:3, 'half-yearly':6, yearly:12 };
+  return amount / (map[cycle] || 1);
 }
 
-/* ─── Found modal ─── */
-function showFnd(c){
-  fCands=c;selF=new Set(c.map(x=>x.id));
-  document.getElementById('ftit').textContent=c.length+' Subscription'+(c.length!==1?'s':'')+' Found';
-  document.getElementById('fsub').textContent='Detected from Gmail — select to import';
-  rndFnd();document.getElementById('fov').classList.add('open');
-}
-function rndFnd(){
-  const l=document.getElementById('flst');
-  l.innerHTML=fCands.map(c=>{const s=selF.has(c.id),d=du(c.renewalDate),dl=d>0?d+'d left':'due now',bun=c.bundledVia?` · via ${c.bundledVia}`:'',ed=c.endDate?` · expires ${fd(c.endDate)}`:'';
-  return`<div class="fi${s?' sel':''}" data-id="${c.id}"><div class="fk">✓</div><div style="font-size:18px;flex-shrink:0">${c.icon||'📦'}</div><div style="flex:1;min-width:0"><div class="fn">${c.name}</div><div class="fm">${c.cycle} · ${dl}${bun}${ed}</div></div><div class="fa">${fmt(Math.round(c.amount))}</div></div>`}).join('');
-  l.querySelectorAll('.fi').forEach(el=>el.addEventListener('click',()=>{const id=el.dataset.id;selF.has(id)?selF.delete(id):selF.add(id);rndFnd()}));
-  document.getElementById('fimp').textContent=`Import ${selF.size}`;
-}
-async function impSel(){
-  const imp=fCands.filter(c=>selF.has(c.id));for(const s of imp)await put(s);
-  subs=await ga();await autoAdv();subs=await ga();
-  document.getElementById('fov').classList.remove('open');document.getElementById('scan').style.display='flex';
-  document.getElementById('sbtn').disabled=false;document.getElementById('sbtn').textContent='Rescan';
-  render();toast(imp.length+' imported ✓');
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const now  = new Date(); now.setHours(0,0,0,0);
+  const then = new Date(dateStr); then.setHours(0,0,0,0);
+  return Math.round((then - now) / 86400000);
 }
 
-/* ─── Render ─── */
-function render(){
-  let f=[...subs];
-  if(curF==='urgent')f=f.filter(s=>{const d=du(s.renewalDate);return d>=0&&d<=7});
-  else if(curF!=='all')f=f.filter(s=>s.category===curF);
-  if(sortM==='renewal')f.sort((a,b)=>new Date(a.renewalDate)-new Date(b.renewalDate));
-  else if(sortM==='alpha')f.sort((a,b)=>a.name.localeCompare(b.name));
-  else if(sortM==='amount')f.sort((a,b)=>tm(b.amount,b.cycle)-tm(a.amount,a.cycle));
-
-  const act=subs.filter(s=>du(s.renewalDate)>=0);
-  const mo=act.reduce((s,x)=>s+tm(x.amount,x.cycle),0);
-  const due=act.filter(s=>du(s.renewalDate)<=7).length;
-  document.getElementById('smo').textContent=fmt(Math.round(mo));
-  document.getElementById('sdu').textContent=due;
-  document.getElementById('sct').textContent=act.length;
-
-  const urg=f.filter(s=>{const d=du(s.renewalDate);return d>=0&&d<=7});
-  const us=document.getElementById('usec');
-  if(urg.length>0&&curF==='all'){us.style.display='block';document.getElementById('ulst').innerHTML=urg.map(cH).join('')}else us.style.display='none';
-
-  const main=curF==='all'?f.filter(s=>{const d=du(s.renewalDate);return d>7||d<0}):f;
-  const le=document.getElementById('slst'),em=document.getElementById('emt');
-  if(main.length===0&&urg.length===0){le.innerHTML='';em.style.display='block';le.appendChild(em)}
-  else{em.style.display='none';le.innerHTML=main.map(cH).join('')}
-  le.querySelectorAll('.cd').forEach(el=>el.addEventListener('click',()=>openDet(el.dataset.id)));
-  document.querySelectorAll('#ulst .cd').forEach(el=>el.addEventListener('click',()=>openDet(el.dataset.id)));
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
 }
 
-function cH(s){
-  const d=du(s.renewalDate),status=st(s),max={monthly:30,quarterly:90,'half-yearly':180,yearly:365}[s.cycle]||30;
-  const pct=Math.min(100,Math.round(Math.max(0,max-d)/max*100));
-  const col=status==='urgent'?'var(--rd)':status==='warning'?'var(--am)':status==='expired'?'var(--bd)':'var(--gn)';
-  const bun=s.bundledVia?`<span class="tg tbu">via ${s.bundledVia}</span>`:'';
-  const lbl=s.endDate?'Expires':'Renews';
-  return`<div class="cd" data-id="${s.id}"><div class="ci">${s.icon||'📦'}</div><div class="cif"><div class="cn">${s.name}</div><div class="cm">${pill(status,d)} ${bun}</div></div><div class="cr"><div class="ca">${fmt(s.amount)}</div><div class="cc">${lbl} ${fd(s.renewalDate)}</div></div><div class="cbar"><div class="cbf" style="width:${pct}%;background:${col}"></div></div></div>`
+function fmtINR(n) {
+  if (!n) return '₹0';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
 }
 
-/* ─── Detail ─── */
-function openDet(id){
-  const s=subs.find(x=>x.id===id);if(!s)return;
-  const d=du(s.renewalDate),status=st(s),mo=tm(s.amount,s.cycle);
-  const mrpH=s.mrp&&s.mrp>s.amount?`<div class="dt"><div class="dl">MRP</div><div class="dv" style="text-decoration:line-through;color:var(--mt)">${fmt(s.mrp)}</div></div><div class="dt"><div class="dl">You Paid</div><div class="dv" style="color:var(--gn)">${fmt(s.amount)}</div></div>`:'';
-  const bunH=s.bundledVia?`<div class="dt" style="grid-column:1/-1"><div class="dl">Bundled Via</div><div class="dv">${s.bundledVia}</div></div>`:'';
-  const notH=s.notes?`<div class="dt" style="grid-column:1/-1"><div class="dl">Notes</div><div class="dv" style="font-size:12px;color:var(--mt)">${s.notes}</div></div>`:'';
-  document.getElementById('dc').innerHTML=`
-    <div class="dh"><div class="di">${s.icon||'📦'}</div><div><div class="dn">${s.name}</div><div class="dc">${s.category}${s.fromGmail?' · Gmail':''}${s.bundledVia?' · Bundled':''}</div></div>${pill(status,d)}</div>
-    <div class="dg">
-      <div class="dt"><div class="dl">Amount</div><div class="dv">${fmt(s.amount)}</div></div>
-      <div class="dt"><div class="dl">Monthly Eq.</div><div class="dv">${fmt(Math.round(mo))}</div></div>
-      <div class="dt"><div class="dl">Start</div><div class="dv">${fd(s.startDate)}</div></div>
-      <div class="dt"><div class="dl">${s.endDate?'Expires':'Next Renewal'}</div><div class="dv">${fd(s.renewalDate)}</div></div>
-      <div class="dt" style="grid-column:1/-1"><div class="dl">Cycle</div><div class="dv" style="text-transform:capitalize">${s.cycle}</div></div>
-      ${mrpH}${bunH}${notH}
-    </div>
-    <div class="br"><button class="bt bd" onclick="delS('${s.id}')">Delete</button><button class="bt bp" onclick="edS('${s.id}')">Edit</button></div>`;
-  document.getElementById('dov').classList.add('open');
+function showToast(msg, dur = 2400) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
 }
 
-/* ─── Add/Edit ─── */
-const EM=['🤖','✨','🍎','📶','🏠','☁️','🏨','📦','🔗','💼','🎮','💪','🍽️','🛒','▶️','🎬','🎵','📰','🔐','🧘','🎯','🌐','💡','⭐'];
-function openAdd(id=null){
-  editId=id;const s=id?subs.find(x=>x.id===id):null;
-  document.getElementById('mtit').textContent=s?'Edit':'Add Subscription';
-  document.getElementById('fn').value=s?.name||'';
-  document.getElementById('fam').value=s?.amount??'';
-  document.getElementById('fmr').value=s?.mrp||'';
-  document.getElementById('fcy').value=s?.cycle||'monthly';
-  document.getElementById('fsd').value=s?.startDate||new Date().toISOString().split('T')[0];
-  document.getElementById('frd').value=s?.renewalDate||'';
-  document.getElementById('fca').value=s?.category||'software';
-  document.getElementById('fbu').value=s?.bundledVia||'';
-  document.getElementById('fno').value=s?.notes||'';
-  selE=s?.icon||'📦';
-  const row=document.getElementById('feg');
-  row.innerHTML=EM.map(e=>`<div class="eo${e===selE?' on':''}" data-e="${e}">${e}</div>`).join('');
-  row.querySelectorAll('.eo').forEach(el=>el.addEventListener('click',()=>{row.querySelectorAll('.eo').forEach(x=>x.classList.remove('on'));el.classList.add('on');selE=el.dataset.e}));
-  document.getElementById('aov').classList.add('open');
-  document.getElementById('dov').classList.remove('open');
-}
-async function saveS(){
-  const nm=document.getElementById('fn').value.trim(),am=parseFloat(document.getElementById('fam').value)||0,mr=parseFloat(document.getElementById('fmr').value)||0;
-  const cy=document.getElementById('fcy').value,sd=document.getElementById('fsd').value,rd=document.getElementById('frd').value;
-  const ca=document.getElementById('fca').value,bu=document.getElementById('fbu').value.trim(),no=document.getElementById('fno').value.trim();
-  if(!nm||!sd||!rd){toast('Fill required fields');return}
-  await put({id:editId||Date.now().toString(),name:nm,amount:am,mrp:mr,cycle:cy,startDate:sd,renewalDate:rd,endDate:rd,category:ca,notes:no,icon:selE,bundledVia:bu,createdAt:editId?(subs.find(s=>s.id===editId)?.createdAt||Date.now()):Date.now()});
-  subs=await ga();document.getElementById('aov').classList.remove('open');render();toast(editId?'Updated ✓':'Added ✓');
-}
-async function delS(id){if(!confirm('Delete this subscription?'))return;await del(id);subs=subs.filter(s=>s.id!==id);document.getElementById('dov').classList.remove('open');render();toast('Deleted')}
-function edS(id){openAdd(id)}
-
-/* ─── Notifications ─── */
-async function reqN(){
-  if(!('Notification' in window)){toast('Not supported');return}
-  const p=await Notification.requestPermission();
-  if(p==='granted'){document.getElementById('nbar').style.display='none';toast('Reminders enabled 🔔');schedN()}else toast('Permission denied');
-}
-async function schedN(){
-  if(Notification.permission!=='granted')return;
-  try{const reg=await navigator.serviceWorker.ready;
-  for(const s of subs){if(du(s.renewalDate)===7)reg.showNotification(`${s.icon} ${s.name} — 7 days left`,{body:`${fmt(s.amount)} / ${s.cycle} — keep or cancel?`,icon:'./icon-192.png',tag:'s-'+s.id})}}catch{}
-  localStorage.setItem('st-chk',Date.now());
+/* ────────────────────────────────────────────────────────────────────────
+   RENDER
+   ──────────────────────────────────────────────────────────────────────── */
+function computeRenewal(sub) {
+  if (sub.endDate) return { date: sub.endDate, type: 'expires' };
+  if (!sub.lastPaidDate) return { date: null, type: 'renewal' };
+  const map = { monthly:1, quarterly:3, 'half-yearly':6, yearly:12 };
+  const months = map[sub.cycle] || 1;
+  const d = new Date(sub.lastPaidDate);
+  d.setMonth(d.getMonth() + months);
+  return { date: d.toISOString().slice(0,10), type: 'renewal' };
 }
 
-/* ─── Toast ─── */
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function render() {
+  const cards = document.getElementById('cards');
+  const empty  = document.getElementById('empty');
+  const alert  = document.getElementById('alertStrip');
 
-/* ─── Events ─── */
-document.getElementById('sbtn').addEventListener('click',runScan);
-document.getElementById('fab').addEventListener('click',()=>openAdd());
-document.getElementById('canb').addEventListener('click',()=>document.getElementById('aov').classList.remove('open'));
-document.getElementById('savb').addEventListener('click',saveS);
-document.getElementById('nbtn').addEventListener('click',reqN);
-document.getElementById('enbtn').addEventListener('click',reqN);
-document.getElementById('fskip').addEventListener('click',()=>{document.getElementById('fov').classList.remove('open');document.getElementById('scan').style.display='flex';document.getElementById('sbtn').disabled=false;document.getElementById('sbtn').textContent='Rescan'});
-document.getElementById('fimp').addEventListener('click',impSel);
-['aov','dov','fov'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('open')}));
-document.getElementById('flt').addEventListener('click',e=>{const c=e.target.closest('.fc');if(!c)return;document.querySelectorAll('.fc').forEach(x=>x.classList.remove('on'));c.classList.add('on');curF=c.dataset.f;render()});
-document.getElementById('sbrt').addEventListener('click',()=>{const m=['renewal','alpha','amount'],l={renewal:'By date',alpha:'A–Z',amount:'By cost'};sortM=m[(m.indexOf(sortM)+1)%m.length];toast('Sorted: '+l[sortM]);render()});
-['fcy','fsd'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{const s=document.getElementById('fsd').value,c=document.getElementById('fcy').value;if(s&&c)document.getElementById('frd').value=adv(s,c)}));
+  // filter
+  let list = subs.slice();
+  const today = new Date(); today.setHours(0,0,0,0);
 
-/* ─── PWA Install ─── */
-let defP=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();defP=e;document.getElementById('ibanner').classList.add('vis')});
-document.getElementById('ibtn').addEventListener('click',async()=>{if(!defP)return;defP.prompt();const{outcome}=await defP.userChoice;defP=null;document.getElementById('ibanner').classList.remove('vis');if(outcome==='accepted')toast('Installed 🎉')});
-window.addEventListener('appinstalled',()=>document.getElementById('ibanner').classList.remove('vis'));
+  if (activeFilter === 'Due Soon') {
+    list = list.filter(s => {
+      const r = computeRenewal(s); const d = daysUntil(r.date);
+      return d !== null && d >= 0 && d <= 7;
+    });
+  } else if (activeFilter !== 'All') {
+    list = list.filter(s => s.category === activeFilter);
+  }
 
-/* ─── Service Worker ─── */
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.type==='CHECK_RENEWALS')schedN()});
+  // sort
+  list.sort((a,b) => {
+    if (sortMode === 'amount') return toMonthly(b.amount, b.cycle) - toMonthly(a.amount, a.cycle);
+    if (sortMode === 'name')   return a.name.localeCompare(b.name);
+    // date: soonest renewal first
+    const ra = computeRenewal(a).date || '9999';
+    const rb = computeRenewal(b).date || '9999';
+    return ra.localeCompare(rb);
+  });
+
+  // alert strip
+  const hasDue = subs.some(s => { const r=computeRenewal(s); const d=daysUntil(r.date); return d!==null&&d>=0&&d<=7; });
+  alert.classList.toggle('hidden', !hasDue);
+
+  // monthly total
+  const monthly = subs.reduce((acc, s) => acc + toMonthly(s.amount, s.cycle), 0);
+  document.getElementById('statMonthly').textContent = fmtINR(monthly);
+
+  // due soon
+  const dueCnt = subs.filter(s => { const r=computeRenewal(s); const d=daysUntil(r.date); return d!==null&&d>=0&&d<=7; }).length;
+  document.getElementById('statDueSoon').textContent = dueCnt;
+  document.getElementById('statActive').textContent  = subs.length;
+
+  cards.innerHTML = '';
+  if (list.length === 0) { empty.classList.add('show'); return; }
+  empty.classList.remove('show');
+
+  for (const sub of list) {
+    const ren = computeRenewal(sub);
+    const days = daysUntil(ren.date);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    if (days !== null && days >= 0 && days <= 3) card.classList.add('due-critical');
+    else if (days !== null && days >= 0 && days <= 7) card.classList.add('due-soon');
+
+    const savings = (sub.mrp && sub.amount && sub.mrp > sub.amount) ? sub.mrp - sub.amount : 0;
+    const dateLabel = ren.date
+      ? (days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days !== null && days >= 0 && days <= 30 ? `in ${days}d` : fmtDate(ren.date))
+      : '—';
+    const dateClass = days !== null && days >= 0 && days <= 3 ? 'crit' : days !== null && days >= 0 && days <= 7 ? 'warn' : '';
+    const renewLabel = ren.type === 'expires' ? 'Expires' : 'Renews';
+
+    card.innerHTML = `
+      <div class="card-icon">${sub.icon || '📦'}</div>
+      <div class="card-body">
+        <div class="card-name">${sub.name}</div>
+        <div class="card-meta">
+          <span class="card-cycle">${sub.cycle}</span>
+          <span class="card-category">${sub.category}</span>
+        </div>
+        <div class="card-date ${dateClass}">${renewLabel}: ${dateLabel}</div>
+        ${sub.bundledVia ? `<span class="card-bundled">via ${sub.bundledVia}</span>` : ''}
+      </div>
+      <div class="card-right">
+        <div class="card-amount">${sub.bundledVia ? '<span style="color:var(--green);font-size:12px">FREE</span>' : fmtINR(sub.amount)}</div>
+        ${sub.mrp && !sub.bundledVia ? `<div class="card-mrp">${fmtINR(sub.mrp)}</div>` : ''}
+        ${savings && !sub.bundledVia ? `<div class="card-savings">save ${fmtINR(savings)}</div>` : ''}
+      </div>
+    `;
+    card.addEventListener('click', () => openDetail(sub.id));
+    cards.appendChild(card);
+  }
 }
 
-/* ─── Init ─── */
-(async()=>{
-  await odb();subs=await ga();await autoAdv();subs=await ga();
-  if('Notification' in window&&Notification.permission==='default')document.getElementById('nbar').style.display='flex';
-  const lc=localStorage.getItem('st-chk');if(!lc||Date.now()-lc>864e5)schedN();
+/* ────────────────────────────────────────────────────────────────────────
+   DETAIL MODAL
+   ──────────────────────────────────────────────────────────────────────── */
+function openDetail(id) {
+  const sub = subs.find(s => s.id === id);
+  if (!sub) return;
+  const ren = computeRenewal(sub);
+  const days = daysUntil(ren.date);
+
+  document.getElementById('dIcon').textContent = sub.icon || '📦';
+  document.getElementById('dName').textContent = sub.name;
+  document.getElementById('dCat').textContent  = sub.category + (sub.bundledVia ? ' · via ' + sub.bundledVia : '');
+
+  const rows = [
+    ['Amount',   fmtINR(sub.amount) + (sub.bundledVia ? ' (FREE via ' + sub.bundledVia + ')' : '')],
+    ['MRP',      sub.mrp ? fmtINR(sub.mrp) : '—'],
+    ['Cycle',    sub.cycle],
+    ['Monthly equivalent', fmtINR(toMonthly(sub.amount, sub.cycle))],
+    [ren.type === 'expires' ? 'Expires' : 'Renews',
+     ren.date ? fmtDate(ren.date) + (days !== null ? ` (${days >= 0 ? 'in ' + days + 'd' : 'passed'})` : '') : '—'],
+    ['Last Paid', fmtDate(sub.lastPaidDate)],
+    sub.notes ? ['Notes', sub.notes] : null,
+  ].filter(Boolean);
+
+  document.getElementById('dRows').innerHTML = rows.map(([k,v]) =>
+    `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`
+  ).join('');
+
+  document.getElementById('dDelete').onclick = () => deleteSub(id);
+  document.getElementById('dEdit').onclick   = () => { closeDetail(); openEdit(id); };
+
+  document.getElementById('detailBackdrop').classList.add('show');
+}
+function closeDetail() { document.getElementById('detailBackdrop').classList.remove('show'); }
+
+async function deleteSub(id) {
+  if (!confirm('Delete this subscription?')) return;
+  await dbDelete(id);
+  subs = subs.filter(s => s.id !== id);
+  closeDetail();
   render();
+  showToast('Deleted');
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   ADD / EDIT MODAL
+   ──────────────────────────────────────────────────────────────────────── */
+function buildIconPicker() {
+  const p = document.getElementById('iconPicker');
+  p.innerHTML = '';
+  for (const ic of ICONS) {
+    const btn = document.createElement('button');
+    btn.className = 'icon-pick' + (ic === selectedIcon ? ' selected' : '');
+    btn.textContent = ic;
+    btn.type = 'button';
+    btn.onclick = () => {
+      selectedIcon = ic;
+      document.querySelectorAll('.icon-pick').forEach(b => b.classList.toggle('selected', b.textContent === ic));
+    };
+    p.appendChild(btn);
+  }
+}
+
+function openAdd() {
+  editingId = null;
+  selectedIcon = '⭐';
+  document.getElementById('addModalTitle').textContent = 'Add Subscription';
+  document.getElementById('fName').value   = '';
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fMrp').value    = '';
+  document.getElementById('fCycle').value  = 'monthly';
+  document.getElementById('fStart').value  = '';
+  document.getElementById('fEnd').value    = '';
+  document.getElementById('fCat').value    = 'Software';
+  document.getElementById('fBundled').value = '';
+  document.getElementById('fNotes').value  = '';
+  buildIconPicker();
+  document.getElementById('addBackdrop').classList.add('show');
+  setTimeout(() => document.getElementById('fName').focus(), 100);
+}
+
+function openEdit(id) {
+  const sub = subs.find(s => s.id === id);
+  if (!sub) return;
+  editingId = id;
+  selectedIcon = sub.icon || '⭐';
+  document.getElementById('addModalTitle').textContent = 'Edit Subscription';
+  document.getElementById('fName').value    = sub.name;
+  document.getElementById('fAmount').value  = sub.amount || '';
+  document.getElementById('fMrp').value     = sub.mrp || '';
+  document.getElementById('fCycle').value   = sub.cycle;
+  document.getElementById('fStart').value   = sub.lastPaidDate || '';
+  document.getElementById('fEnd').value     = sub.endDate || '';
+  document.getElementById('fCat').value     = sub.category;
+  document.getElementById('fBundled').value = sub.bundledVia || '';
+  document.getElementById('fNotes').value   = sub.notes || '';
+  buildIconPicker();
+  document.getElementById('addBackdrop').classList.add('show');
+}
+
+function closeAdd() { document.getElementById('addBackdrop').classList.remove('show'); }
+
+async function saveSub() {
+  const name = document.getElementById('fName').value.trim();
+  if (!name) { showToast('Name is required'); return; }
+  const sub = {
+    id:           editingId || uid(),
+    name,
+    icon:         selectedIcon,
+    amount:       parseFloat(document.getElementById('fAmount').value) || 0,
+    mrp:          parseFloat(document.getElementById('fMrp').value) || 0,
+    cycle:        document.getElementById('fCycle').value,
+    lastPaidDate: document.getElementById('fStart').value,
+    endDate:      document.getElementById('fEnd').value,
+    category:     document.getElementById('fCat').value,
+    source:       'manual',
+    bundledVia:   document.getElementById('fBundled').value.trim(),
+    notes:        document.getElementById('fNotes').value.trim(),
+  };
+  await dbPut(sub);
+  if (editingId) {
+    subs = subs.map(s => s.id === editingId ? sub : s);
+  } else {
+    subs.push(sub);
+  }
+  closeAdd();
+  render();
+  showToast(editingId ? 'Updated ✓' : 'Added ✓');
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   GMAIL SCAN via Cloudflare Worker proxy
+   ──────────────────────────────────────────────────────────────────────── */
+async function scanGmail() {
+  if (EMAILS.length === 0) {
+    showToast('No emails to scan (EMAILS array is empty)');
+    return;
+  }
+
+  const status = document.getElementById('scanStatus');
+  const statusText = document.getElementById('scanStatusText');
+  const scanBtn = document.getElementById('scanBtn');
+
+  status.classList.add('show');
+  statusText.textContent = 'Scanning emails…';
+  scanBtn.disabled = true;
+
+  const prompt = `You are a subscription detector. Analyse these email objects and identify any recurring subscriptions, memberships or services.
+
+Return ONLY a valid JSON array — no markdown, no explanation, no code fences.
+
+Each item: { "name": string, "icon": one emoji, "amount": number (INR, 0 if free), "mrp": number (0 if unknown), "cycle": "monthly"|"quarterly"|"half-yearly"|"yearly", "lastPaidDate": "YYYY-MM-DD" or "", "endDate": "YYYY-MM-DD" or "", "category": "Software"|"Streaming"|"Telecom"|"Fitness"|"Lifestyle"|"News"|"Other", "source": "gmail", "bundledVia": "" }
+
+Emails:
+${JSON.stringify(EMAILS.slice(0, 40), null, 2)}`;
+
+  try {
+    const r = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      throw new Error(`Worker error ${r.status}: ${err}`);
+    }
+
+    const data = await r.json();
+    const text = data.content?.[0]?.text || '[]';
+    let parsed;
+    try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); }
+    catch { throw new Error('Could not parse AI response'); }
+
+    let added = 0;
+    for (const item of parsed) {
+      const existing = subs.find(s => s.name.toLowerCase() === item.name?.toLowerCase());
+      if (existing) continue;
+      const sub = { id: uid(), ...item };
+      await dbPut(sub);
+      subs.push(sub);
+      added++;
+    }
+    render();
+    showToast(added > 0 ? `Found ${added} new subscription${added>1?'s':''}` : 'No new subscriptions found');
+  } catch (e) {
+    console.error(e);
+    showToast('Scan failed: ' + e.message, 4000);
+  } finally {
+    status.classList.remove('show');
+    scanBtn.disabled = false;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   NOTIFICATIONS
+   ──────────────────────────────────────────────────────────────────────── */
+async function requestNotifications() {
+  if (!('Notification' in window)) { showToast('Notifications not supported'); return; }
+  const perm = await Notification.requestPermission();
+  document.getElementById('notifBar').classList.add('hidden');
+  if (perm === 'granted') {
+    showToast('Reminders enabled ✓');
+    scheduleNotifications();
+  } else {
+    showToast('Notifications blocked');
+  }
+}
+
+function scheduleNotifications() {
+  if (Notification.permission !== 'granted') return;
+  for (const sub of subs) {
+    const ren = computeRenewal(sub);
+    const days = daysUntil(ren.date);
+    if (days !== null && days >= 0 && days <= 7) {
+      const msg = days === 0
+        ? `${sub.name} ${ren.type}s today!`
+        : `${sub.name} ${ren.type}s in ${days} day${days>1?'s':''}`;
+      new Notification('SubTracker', { body: msg, icon: '/icon-192.png' });
+    }
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   FILTERS + SORT
+   ──────────────────────────────────────────────────────────────────────── */
+document.getElementById('filters').addEventListener('click', e => {
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  activeFilter = chip.dataset.filter;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === activeFilter));
+  render();
+});
+
+document.getElementById('sortBtn').addEventListener('click', () => {
+  const modes = ['date','amount','name'];
+  sortMode = modes[(modes.indexOf(sortMode)+1) % modes.length];
+  showToast('Sort: ' + sortMode);
+  render();
+});
+
+/* ────────────────────────────────────────────────────────────────────────
+   INSTALL PWA
+   ──────────────────────────────────────────────────────────────────────── */
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  document.getElementById('installBar').classList.remove('hidden');
+  document.getElementById('installIconBtn').style.display = 'flex';
+});
+function doInstall() {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  deferredInstall.userChoice.then(c => {
+    document.getElementById('installBar').classList.add('hidden');
+    deferredInstall = null;
+    if (c.outcome === 'accepted') showToast('App installed ✓');
+  });
+}
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBar').classList.add('hidden');
+  document.getElementById('installIconBtn').style.display = 'none';
+});
+
+/* ────────────────────────────────────────────────────────────────────────
+   EVENT BINDINGS
+   ──────────────────────────────────────────────────────────────────────── */
+document.getElementById('fab').addEventListener('click', openAdd);
+document.getElementById('addCancel').addEventListener('click', closeAdd);
+document.getElementById('addSave').addEventListener('click', saveSub);
+document.getElementById('addBackdrop').addEventListener('click', e => { if (e.target === e.currentTarget) closeAdd(); });
+document.getElementById('detailBackdrop').addEventListener('click', e => { if (e.target === e.currentTarget) closeDetail(); });
+document.getElementById('scanBtn').addEventListener('click', scanGmail);
+document.getElementById('notifBtn').addEventListener('click', requestNotifications);
+document.getElementById('notifEnable').addEventListener('click', requestNotifications);
+document.getElementById('installBtn').addEventListener('click', doInstall);
+document.getElementById('installIconBtn').addEventListener('click', doInstall);
+document.getElementById('installSkip').addEventListener('click', () => document.getElementById('installBar').classList.add('hidden'));
+
+/* ────────────────────────────────────────────────────────────────────────
+   BOOT
+   ──────────────────────────────────────────────────────────────────────── */
+(async () => {
+  db = await openDB();
+
+  // Load from DB
+  const stored = await dbGetAll();
+  const storedIds = new Set(stored.map(s => s.id));
+
+  // Seed missing pre-loaded subs
+  for (const seed of SEED_SUBS) {
+    if (!storedIds.has(seed.id)) {
+      await dbPut(seed);
+      stored.push(seed);
+    }
+  }
+  subs = stored;
+
+  render();
+
+  // Notification bar
+  if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+    document.getElementById('notifBar').classList.remove('hidden');
+  }
+
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/Subscription-Tracker/sw.js').catch(console.warn);
+  }
 })();
 </script>
 </body>
