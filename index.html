@@ -1324,9 +1324,7 @@ ${JSON.stringify(EMAILS.slice(0, 40), null, 2)}`;
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }]
+        contents: [{ parts: [{ text: prompt }] }]
       })
     });
 
@@ -1336,7 +1334,7 @@ ${JSON.stringify(EMAILS.slice(0, 40), null, 2)}`;
     }
 
     const data = await r.json();
-    const text = data.content?.[0]?.text || '[]';
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
     let parsed;
     try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); }
     catch { throw new Error('Could not parse AI response'); }
