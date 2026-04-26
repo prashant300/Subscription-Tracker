@@ -1,4 +1,4 @@
-const CACHE = 'subtracker-v4';
+const CACHE = 'subtracker-v5';
 const PRECACHE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

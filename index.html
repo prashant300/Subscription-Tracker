@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="theme-color" content="#fafaf8"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="description" content="Track your subscriptions — renewals, costs, and savings at a glance."/>
 <title>SubTracker</title>
 <link rel="manifest" href="manifest.json"/>
@@ -611,7 +612,7 @@ input, select, textarea { font-family: inherit; }
   <!-- ACTIONS -->
   <div class="action-strip">
     <button class="action-btn secondary" id="scanBtn">
-      <span class="btn-icon">⦿</span> Gmail Scan
+      <span class="btn-icon">🔑</span> Authorise Gmail
     </button>
     <button class="action-btn primary" id="notifBtn">
       <span class="btn-icon">🔔</span> Reminders
@@ -1109,6 +1110,18 @@ async function saveSub() {
 /* ────────────────────────────────────────────────────────────────────────
    GMAIL SCAN — OAuth + live fetch + Gemini analysis
    ──────────────────────────────────────────────────────────────────────── */
+function setScanBtn(state) {
+  const btn = document.getElementById('scanBtn');
+  const map = {
+    auth:    { icon: '🔑', label: 'Authorise Gmail' },
+    scan:    { icon: '⦿',  label: 'Gmail Scan' },
+    refresh: { icon: '↻',  label: 'Refresh' },
+  };
+  const { icon, label } = map[state] || map.auth;
+  btn.innerHTML = `<span class="btn-icon">${icon}</span> ${label}`;
+  btn.disabled = false;
+}
+
 function initGoogleAuth() {
   if (!window.google?.accounts?.oauth2) return;
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -1117,7 +1130,7 @@ function initGoogleAuth() {
     callback: async (response) => {
       if (response.error) {
         showToast('Google auth failed: ' + response.error, 4000);
-        document.getElementById('scanBtn').disabled = false;
+        setScanBtn('auth');
         document.getElementById('scanStatus').classList.remove('show');
         return;
       }
@@ -1221,7 +1234,7 @@ ${JSON.stringify(emails, null, 2)}`;
     showToast('Scan failed: ' + e.message, 4000);
   } finally {
     status.classList.remove('show');
-    scanBtn.disabled = false;
+    setScanBtn('refresh');
   }
 }
 
@@ -1230,10 +1243,16 @@ function scanGmail() {
     showToast('Google auth not initialised — check Client ID', 4000);
     return;
   }
-  document.getElementById('scanBtn').disabled = true;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
   document.getElementById('scanStatus').classList.add('show');
-  document.getElementById('scanStatusText').textContent = 'Connecting to Gmail…';
-  tokenClient.requestAccessToken({ prompt: gmailAccessToken ? '' : 'consent' });
+  document.getElementById('scanStatusText').textContent = gmailAccessToken ? 'Refreshing…' : 'Connecting to Gmail…';
+  // If we already have a token, skip the OAuth popup and scan directly
+  if (gmailAccessToken) {
+    fetchAndScan();
+  } else {
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  }
 }
 
 /* ────────────────────────────────────────────────────────────────────────
