@@ -283,6 +283,7 @@ input, select, textarea { font-family: inherit; }
 .card:hover { border-color: var(--ink3); box-shadow: var(--shadow-md); }
 .card.due-soon { border-left: 3px solid var(--amber); }
 .card.due-critical { border-left: 3px solid var(--red); }
+.card.stale { opacity: 0.55; }
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -669,8 +670,10 @@ input, select, textarea { font-family: inherit; }
   <div class="empty" id="empty">
     <div class="empty-emoji">🔭</div>
     <div class="empty-title">No subscriptions yet</div>
-    <div class="empty-sub">Tap Scan to detect from Gmail, or + to add manually.</div>
+    <div class="empty-sub">Tap Authorise Gmail to scan, or + to add manually.</div>
   </div>
+  <div class="section-label hidden" id="reviewLabel" style="color:var(--amber)">⚠ Needs Review — renewal date may be outdated</div>
+  <div class="cards" id="reviewCards"></div>
 </div>
 
 <!-- FAB -->
@@ -870,6 +873,7 @@ function fmtDate(dateStr) {
 }
 
 function fmtINR(n) {
+  if (n === null || n === undefined) return '₹?';
   if (!n) return '₹0';
   return '₹' + Math.round(n).toLocaleString('en-IN');
 }
@@ -879,6 +883,44 @@ function showToast(msg, dur = 2400) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), dur);
+}
+
+/* ─── Dismissed list (persists scan exclusions) ──────────────────────────── */
+function getDismissed() {
+  try { return JSON.parse(localStorage.getItem('dismissedSubs') || '[]'); }
+  catch { return []; }
+}
+function addDismissed(name) {
+  const list = getDismissed();
+  const key = name.toLowerCase().trim();
+  if (!list.includes(key)) localStorage.setItem('dismissedSubs', JSON.stringify([...list, key]));
+}
+
+/* ─── Fuzzy duplicate detection ──────────────────────────────────────────── */
+const STOP = new Set(['the','a','an','and','or','for','of','in','on','at','to','by','with','plan','subscription','plus','pro','premium','max','super','elite','basic','standard','lite','my','your','new']);
+function sigWords(name) {
+  return name.toLowerCase().split(/[\s\-_\/]+/).filter(w => w.length > 2 && !STOP.has(w));
+}
+function isFuzzyDupe(a, b) {
+  const wa = new Set(sigWords(a)), wb = new Set(sigWords(b));
+  if (!wa.size || !wb.size) return false;
+  const common = [...wa].filter(w => wb.has(w)).length;
+  return common / Math.min(wa.size, wb.size) >= 0.6;
+}
+
+/* ─── Email body extractor (walks MIME tree, decodes base64) ─────────────── */
+function extractEmailBody(payload) {
+  function findData(part, type) {
+    if (part.mimeType === type && part.body?.data) return part.body.data;
+    for (const p of (part.parts || [])) { const r = findData(p, type); if (r) return r; }
+    return null;
+  }
+  const b64 = findData(payload, 'text/plain') || findData(payload, 'text/html');
+  if (!b64) return '';
+  try {
+    const decoded = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    return decoded.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2000);
+  } catch { return ''; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -894,86 +936,113 @@ function computeRenewal(sub) {
   return { date: d.toISOString().slice(0,10), type: 'renewal' };
 }
 
+function buildCard(sub) {
+  const ren = computeRenewal(sub);
+  const days = daysUntil(ren.date);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  if (days !== null && days >= 0 && days <= 3) card.classList.add('due-critical');
+  else if (days !== null && days >= 0 && days <= 7) card.classList.add('due-soon');
+
+  const amtKnown = sub.amount !== null && sub.amount !== undefined && (sub.amount > 0 || sub.bundledVia);
+  const amtDisplay = sub.bundledVia
+    ? '<span style="color:var(--green);font-size:12px">FREE</span>'
+    : amtKnown ? fmtINR(sub.amount)
+    : '<span style="color:var(--ink3);font-size:13px">₹?</span>';
+
+  const savings = (sub.mrp && sub.amount && sub.mrp > sub.amount) ? sub.mrp - sub.amount : 0;
+  const dateLabel = ren.date
+    ? (days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days !== null && days >= 0 && days <= 30 ? `in ${days}d` : fmtDate(ren.date))
+    : '—';
+  const dateClass = days !== null && days >= 0 && days <= 3 ? 'crit' : days !== null && days >= 0 && days <= 7 ? 'warn' : '';
+  const renewLabel = ren.type === 'expires' ? 'Expires' : 'Renews';
+
+  card.innerHTML = `
+    <div class="card-icon">${sub.icon || '📦'}</div>
+    <div class="card-body">
+      <div class="card-name">${sub.name}</div>
+      <div class="card-meta">
+        <span class="card-cycle">${sub.cycle}</span>
+        <span class="card-category">${sub.category}</span>
+      </div>
+      <div class="card-date ${dateClass}">${renewLabel}: ${dateLabel}</div>
+      ${sub.bundledVia ? `<span class="card-bundled">via ${sub.bundledVia}</span>` : ''}
+    </div>
+    <div class="card-right">
+      <div class="card-amount">${amtDisplay}</div>
+      ${sub.mrp && sub.amount && !sub.bundledVia ? `<div class="card-mrp">${fmtINR(sub.mrp)}</div>` : ''}
+      ${savings && !sub.bundledVia ? `<div class="card-savings">save ${fmtINR(savings)}</div>` : ''}
+    </div>
+  `;
+  card.addEventListener('click', () => openDetail(sub.id));
+  return card;
+}
+
 function render() {
-  const cards = document.getElementById('cards');
-  const empty  = document.getElementById('empty');
-  const alert  = document.getElementById('alertStrip');
+  const cards       = document.getElementById('cards');
+  const empty       = document.getElementById('empty');
+  const alert       = document.getElementById('alertStrip');
+  const reviewCards = document.getElementById('reviewCards');
+  const reviewLabel = document.getElementById('reviewLabel');
 
-  // filter
-  let list = subs.slice();
-  const today = new Date(); today.setHours(0,0,0,0);
+  // Partition: expired (endDate past) → hidden; stale computed renewal (>30d past) → review; rest → active
+  const activeSubs = [], staleSubs = [];
+  for (const s of subs) {
+    const ren = computeRenewal(s);
+    const days = daysUntil(ren.date);
+    if (s.endDate && days !== null && days < 0) continue;           // explicitly expired
+    if (!s.endDate && days !== null && days < -30) staleSubs.push(s); // stale computed date
+    else activeSubs.push(s);
+  }
 
+  // Apply filter to active list
+  let list = activeSubs.slice();
   if (activeFilter === 'Due Soon') {
-    list = list.filter(s => {
-      const r = computeRenewal(s); const d = daysUntil(r.date);
-      return d !== null && d >= 0 && d <= 7;
-    });
+    list = list.filter(s => { const r = computeRenewal(s); const d = daysUntil(r.date); return d !== null && d >= 0 && d <= 7; });
   } else if (activeFilter !== 'All') {
     list = list.filter(s => s.category === activeFilter);
   }
 
-  // sort
-  list.sort((a,b) => {
-    if (sortMode === 'amount') return toMonthly(b.amount, b.cycle) - toMonthly(a.amount, a.cycle);
+  // Sort
+  list.sort((a, b) => {
+    if (sortMode === 'amount') return toMonthly(b.amount || 0, b.cycle) - toMonthly(a.amount || 0, a.cycle);
     if (sortMode === 'name')   return a.name.localeCompare(b.name);
-    // date: soonest renewal first
     const ra = computeRenewal(a).date || '9999';
     const rb = computeRenewal(b).date || '9999';
     return ra.localeCompare(rb);
   });
 
-  // alert strip
-  const hasDue = subs.some(s => { const r=computeRenewal(s); const d=daysUntil(r.date); return d!==null&&d>=0&&d<=7; });
+  // Stats based on activeSubs (not filtered list)
+  const hasDue = activeSubs.some(s => { const r = computeRenewal(s); const d = daysUntil(r.date); return d !== null && d >= 0 && d <= 7; });
   alert.classList.toggle('hidden', !hasDue);
 
-  // monthly total
-  const monthly = subs.reduce((acc, s) => acc + toMonthly(s.amount, s.cycle), 0);
+  const monthly = activeSubs.reduce((acc, s) => acc + toMonthly(s.amount || 0, s.cycle), 0);
   document.getElementById('statMonthly').textContent = fmtINR(monthly);
 
-  // due soon
-  const dueCnt = subs.filter(s => { const r=computeRenewal(s); const d=daysUntil(r.date); return d!==null&&d>=0&&d<=7; }).length;
+  const dueCnt = activeSubs.filter(s => { const r = computeRenewal(s); const d = daysUntil(r.date); return d !== null && d >= 0 && d <= 7; }).length;
   document.getElementById('statDueSoon').textContent = dueCnt;
-  document.getElementById('statActive').textContent  = subs.length;
+  document.getElementById('statActive').textContent  = activeSubs.length;
 
+  // Main cards
   cards.innerHTML = '';
-  if (list.length === 0) { empty.classList.add('show'); return; }
-  empty.classList.remove('show');
+  if (list.length === 0) { empty.classList.add('show'); } else {
+    empty.classList.remove('show');
+    list.forEach(sub => cards.appendChild(buildCard(sub)));
+  }
 
-  for (const sub of list) {
-    const ren = computeRenewal(sub);
-    const days = daysUntil(ren.date);
-
-    const card = document.createElement('div');
-    card.className = 'card';
-    if (days !== null && days >= 0 && days <= 3) card.classList.add('due-critical');
-    else if (days !== null && days >= 0 && days <= 7) card.classList.add('due-soon');
-
-    const savings = (sub.mrp && sub.amount && sub.mrp > sub.amount) ? sub.mrp - sub.amount : 0;
-    const dateLabel = ren.date
-      ? (days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days !== null && days >= 0 && days <= 30 ? `in ${days}d` : fmtDate(ren.date))
-      : '—';
-    const dateClass = days !== null && days >= 0 && days <= 3 ? 'crit' : days !== null && days >= 0 && days <= 7 ? 'warn' : '';
-    const renewLabel = ren.type === 'expires' ? 'Expires' : 'Renews';
-
-    card.innerHTML = `
-      <div class="card-icon">${sub.icon || '📦'}</div>
-      <div class="card-body">
-        <div class="card-name">${sub.name}</div>
-        <div class="card-meta">
-          <span class="card-cycle">${sub.cycle}</span>
-          <span class="card-category">${sub.category}</span>
-        </div>
-        <div class="card-date ${dateClass}">${renewLabel}: ${dateLabel}</div>
-        ${sub.bundledVia ? `<span class="card-bundled">via ${sub.bundledVia}</span>` : ''}
-      </div>
-      <div class="card-right">
-        <div class="card-amount">${sub.bundledVia ? '<span style="color:var(--green);font-size:12px">FREE</span>' : fmtINR(sub.amount)}</div>
-        ${sub.mrp && !sub.bundledVia ? `<div class="card-mrp">${fmtINR(sub.mrp)}</div>` : ''}
-        ${savings && !sub.bundledVia ? `<div class="card-savings">save ${fmtINR(savings)}</div>` : ''}
-      </div>
-    `;
-    card.addEventListener('click', () => openDetail(sub.id));
-    cards.appendChild(card);
+  // Review section — stale entries, only visible on All filter
+  reviewCards.innerHTML = '';
+  if (staleSubs.length > 0 && activeFilter === 'All') {
+    reviewLabel.classList.remove('hidden');
+    staleSubs.sort((a, b) => a.name.localeCompare(b.name));
+    staleSubs.forEach(sub => {
+      const card = buildCard(sub);
+      card.classList.add('stale');
+      reviewCards.appendChild(card);
+    });
+  } else {
+    reviewLabel.classList.add('hidden');
   }
 }
 
@@ -990,8 +1059,14 @@ function openDetail(id) {
   document.getElementById('dName').textContent = sub.name;
   document.getElementById('dCat').textContent  = sub.category + (sub.bundledVia ? ' · via ' + sub.bundledVia : '');
 
+  const amountVal = sub.bundledVia
+    ? `FREE via ${sub.bundledVia}`
+    : (sub.amount === null || sub.amount === undefined || (sub.amount === 0 && !sub.bundledVia))
+      ? 'Unknown — tap Edit to set'
+      : fmtINR(sub.amount);
+
   const rows = [
-    ['Amount',   fmtINR(sub.amount) + (sub.bundledVia ? ' (FREE via ' + sub.bundledVia + ')' : '')],
+    ['Amount',   amountVal],
     ['MRP',      sub.mrp ? fmtINR(sub.mrp) : '—'],
     ['Cycle',    sub.cycle],
     ['Monthly equivalent', fmtINR(toMonthly(sub.amount, sub.cycle))],
@@ -1014,11 +1089,17 @@ function closeDetail() { document.getElementById('detailBackdrop').classList.rem
 
 async function deleteSub(id) {
   if (!confirm('Delete this subscription?')) return;
+  const sub = subs.find(s => s.id === id);
   await dbDelete(id);
   subs = subs.filter(s => s.id !== id);
   closeDetail();
   render();
-  showToast('Deleted');
+  if (sub?.source === 'gmail') {
+    addDismissed(sub.name);
+    showToast('Removed — won\'t suggest again');
+  } else {
+    showToast('Deleted');
+  }
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -1163,13 +1244,14 @@ async function fetchGmailEmails() {
     const batch = messages.slice(i, i + 10);
     const results = await Promise.all(batch.map(async (msg) => {
       const r = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
         { headers: { Authorization: `Bearer ${gmailAccessToken}` } }
       );
       const data = await r.json();
       const headers = data.payload?.headers || [];
       const get = (name) => headers.find(h => h.name === name)?.value || '';
-      return { subject: get('Subject'), from: get('From'), date: get('Date'), snippet: data.snippet || '' };
+      const body = extractEmailBody(data.payload || {});
+      return { subject: get('Subject'), from: get('From'), date: get('Date'), body };
     }));
     emails.push(...results);
   }
@@ -1185,21 +1267,23 @@ async function fetchAndScan() {
     const emails = await fetchGmailEmails();
     statusText.textContent = 'Analysing with AI…';
 
-    const prompt = `You are a subscription detector. Analyse these email objects and identify recurring subscriptions, memberships, or services the user pays for.
+    const prompt = `You are a subscription detector. Analyse these emails (each has subject, from, date, and body) and identify recurring subscriptions, memberships, or services.
 
 Return ONLY a valid JSON array — no markdown, no explanation, no code fences.
 
-Each item must match this schema exactly:
-{ "name": string, "icon": one emoji, "amount": number (INR, 0 if free/unknown), "mrp": number (full price if discounted, else 0), "cycle": "monthly"|"quarterly"|"half-yearly"|"yearly", "lastPaidDate": "YYYY-MM-DD" or "", "endDate": "YYYY-MM-DD" or "", "category": "Software"|"Streaming"|"Telecom"|"Fitness"|"Lifestyle"|"News"|"Other", "source": "gmail", "bundledVia": "" }
+Schema: { "name": string, "icon": one emoji, "amount": number|null, "mrp": number|null, "cycle": "monthly"|"quarterly"|"half-yearly"|"yearly", "lastPaidDate": "YYYY-MM-DD" or "", "endDate": "YYYY-MM-DD" or "", "category": "Software"|"Streaming"|"Telecom"|"Fitness"|"Lifestyle"|"News"|"Other", "source": "gmail", "bundledVia": "" }
 
 Rules:
-- Only include recurring subscriptions — ignore one-time purchases, shipping, hardware
+- Only recurring subscriptions — ignore one-time purchases, OTPs, shipping, hardware, account alerts
 - Ignore refund, cancellation, failed payment, and chargeback emails
-- If the same service appears in multiple emails, output it once using the most recent email's data
+- "amount": the actual INR amount charged, extracted from the email body (look for ₹, Rs., $, £, € followed by numbers, or lines like "Total", "Amount Due", "Charged"). Set null if no price appears anywhere in the email. NEVER set 0 unless confirmed free/trial.
+- "mrp": the full retail price if the user is getting a discount, else null
+- If the same service appears in multiple emails, output it ONCE using the most recent email's data
 - Convert USD→INR at 84, GBP→INR at 106, EUR→INR at 90
-- If a service is free because it is bundled with another (e.g. Prime via Airtel), set amount=0 and bundledVia to the parent service
-- Trials count as subscriptions; set amount to the trial price (0 if free trial)
-- If cycle is ambiguous, infer from the amount and service type
+- If free because bundled (e.g. Prime with Airtel), set amount=0 and bundledVia to the parent service name
+- "endDate": only if the email explicitly states an expiry/end date. Leave "" otherwise.
+- For insurance policies, the policy period end date is the endDate
+- Consolidate similar service names into one entry (e.g. "Axis Max Life Insurance" and "Axis Max Life Smart Secure Plus Plan" are the same subscription)
 
 Emails:
 ${JSON.stringify(emails, null, 2)}`;
@@ -1219,9 +1303,13 @@ ${JSON.stringify(emails, null, 2)}`;
     catch { throw new Error('Could not parse AI response'); }
 
     let added = 0;
+    const dismissed = getDismissed();
     for (const item of parsed) {
-      const existing = subs.find(s => s.name.toLowerCase() === item.name?.toLowerCase());
-      if (existing) continue;
+      if (!item.name) continue;
+      // Skip if user previously dismissed this (exact or fuzzy match)
+      if (dismissed.some(d => d === item.name.toLowerCase().trim() || isFuzzyDupe(item.name, d))) continue;
+      // Skip if already exists (exact or fuzzy match)
+      if (subs.some(s => s.name.toLowerCase() === item.name.toLowerCase() || isFuzzyDupe(item.name, s.name))) continue;
       const sub = { id: uid(), ...item };
       await dbPut(sub);
       subs.push(sub);
