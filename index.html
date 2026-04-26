@@ -1131,18 +1131,22 @@ async function fetchGmailEmails() {
   const statusText = document.getElementById('scanStatusText');
   statusText.textContent = 'Fetching emails from Gmail…';
 
-  const listRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(GMAIL_QUERY)}&maxResults=100`,
-    { headers: { Authorization: `Bearer ${gmailAccessToken}` } }
-  );
-  if (!listRes.ok) throw new Error('Gmail fetch failed — check OAuth scope');
-  const listData = await listRes.json();
-  const messages = listData.messages || [];
+  // Paginate through all results
+  const messages = [];
+  let pageToken = null;
+  do {
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(GMAIL_QUERY)}&maxResults=500${pageToken ? '&pageToken=' + pageToken : ''}`;
+    const listRes = await fetch(url, { headers: { Authorization: `Bearer ${gmailAccessToken}` } });
+    if (!listRes.ok) throw new Error('Gmail fetch failed — check OAuth scope');
+    const listData = await listRes.json();
+    messages.push(...(listData.messages || []));
+    pageToken = listData.nextPageToken || null;
+  } while (pageToken);
 
-  statusText.textContent = `Reading ${Math.min(messages.length, 60)} emails…`;
+  statusText.textContent = `Reading ${messages.length} emails…`;
 
   const emails = [];
-  for (let i = 0; i < Math.min(messages.length, 60); i += 10) {
+  for (let i = 0; i < messages.length; i += 10) {
     const batch = messages.slice(i, i + 10);
     const results = await Promise.all(batch.map(async (msg) => {
       const r = await fetch(
