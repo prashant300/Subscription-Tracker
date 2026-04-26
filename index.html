@@ -1345,7 +1345,13 @@ document.getElementById('installSkip').addEventListener('click', () => document.
    ──────────────────────────────────────────────────────────────────────── */
 (async () => {
   db = await openDB();
-  subs = await dbGetAll();
+
+  // Remove any previously hardcoded seed entries
+  const all = await dbGetAll();
+  for (const s of all) {
+    if (s.source === 'seed') await dbDelete(s.id);
+  }
+  subs = (await dbGetAll());
   render();
 
   if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
