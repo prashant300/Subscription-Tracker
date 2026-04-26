@@ -364,6 +364,17 @@ input, select, textarea { font-family: inherit; }
   margin-top: 3px;
   display: inline-block;
 }
+.card-unverified {
+  font-size: 10px;
+  color: var(--amber);
+  background: #fff8e1;
+  border: 1px solid #f0c040;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-top: 3px;
+  display: inline-block;
+  cursor: pointer;
+}
 
 /* ─── Empty state ───────────────────────────────────────────────────────── */
 .empty {
@@ -788,7 +799,10 @@ const ICONS = ['🎬','🎵','🎮','📚','💪','☁️','🛒','📰','💼',
 /* ────────────────────────────────────────────────────────────────────────
    GMAIL SEARCH QUERY  — edit this to change what emails are scanned
    ──────────────────────────────────────────────────────────────────────── */
+// Query 1 — payment/billing emails (direct subscriptions)
 const GMAIL_QUERY = 'subject:(receipt OR invoice OR subscription OR renewal OR billing OR "payment confirmation" OR "order confirmation" OR "auto-renew" OR "auto renew") newer_than:365d';
+// Query 2 — activation/membership emails (catches bundled services)
+const GMAIL_QUERY_MEMBERSHIP = 'subject:(membership OR "subscription activated" OR "plan activated" OR "now active" OR "welcome to" OR "included with" OR "activated successfully" OR "benefits" OR "your plan") newer_than:365d';
 
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -968,6 +982,7 @@ function buildCard(sub) {
       </div>
       <div class="card-date ${dateClass}">${renewLabel}: ${dateLabel}</div>
       ${sub.bundledVia ? `<span class="card-bundled">via ${sub.bundledVia}</span>` : ''}
+      ${sub.confidence === 'inferred' ? `<span class="card-unverified" onclick="event.stopPropagation();openEdit('${sub.id}')">⚠ Unverified — tap to confirm</span>` : ''}
     </div>
     <div class="card-right">
       <div class="card-amount">${amtDisplay}</div>
@@ -1173,9 +1188,10 @@ async function saveSub() {
     lastPaidDate: document.getElementById('fStart').value,
     endDate:      document.getElementById('fEnd').value,
     category:     document.getElementById('fCat').value,
-    source:       'manual',
+    source:       editingId ? (subs.find(s => s.id === editingId)?.source || 'manual') : 'manual',
     bundledVia:   document.getElementById('fBundled').value.trim(),
     notes:        document.getElementById('fNotes').value.trim(),
+    confidence:   'confirmed',
   };
   await dbPut(sub);
   if (editingId) {
@@ -1221,27 +1237,40 @@ function initGoogleAuth() {
   });
 }
 
+async function fetchMessageList(query) {
+  const messages = [];
+  let pageToken = null;
+  do {
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=500${pageToken ? '&pageToken=' + pageToken : ''}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${gmailAccessToken}` } });
+    if (!res.ok) throw new Error('Gmail fetch failed — check OAuth scope');
+    const data = await res.json();
+    messages.push(...(data.messages || []));
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return messages;
+}
+
 async function fetchGmailEmails() {
   const statusText = document.getElementById('scanStatusText');
   statusText.textContent = 'Fetching emails from Gmail…';
 
-  // Paginate through all results
-  const messages = [];
-  let pageToken = null;
-  do {
-    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(GMAIL_QUERY)}&maxResults=500${pageToken ? '&pageToken=' + pageToken : ''}`;
-    const listRes = await fetch(url, { headers: { Authorization: `Bearer ${gmailAccessToken}` } });
-    if (!listRes.ok) throw new Error('Gmail fetch failed — check OAuth scope');
-    const listData = await listRes.json();
-    messages.push(...(listData.messages || []));
-    pageToken = listData.nextPageToken || null;
-  } while (pageToken);
+  // Run both queries in parallel, deduplicate by message ID
+  const [paymentMsgs, membershipMsgs] = await Promise.all([
+    fetchMessageList(GMAIL_QUERY),
+    fetchMessageList(GMAIL_QUERY_MEMBERSHIP),
+  ]);
+  const seen = new Set();
+  const allMessages = [];
+  for (const msg of [...paymentMsgs, ...membershipMsgs]) {
+    if (!seen.has(msg.id)) { seen.add(msg.id); allMessages.push(msg); }
+  }
 
-  statusText.textContent = `Reading ${messages.length} emails…`;
+  statusText.textContent = `Reading ${allMessages.length} emails…`;
 
   const emails = [];
-  for (let i = 0; i < messages.length; i += 10) {
-    const batch = messages.slice(i, i + 10);
+  for (let i = 0; i < allMessages.length; i += 10) {
+    const batch = allMessages.slice(i, i + 10);
     const results = await Promise.all(batch.map(async (msg) => {
       const r = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
@@ -1267,23 +1296,25 @@ async function fetchAndScan() {
     const emails = await fetchGmailEmails();
     statusText.textContent = 'Analysing with AI…';
 
-    const prompt = `You are a subscription detector. Analyse these emails (each has subject, from, date, and body) and identify recurring subscriptions, memberships, or services.
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const prompt = `You are a subscription detector. Today's date is ${todayISO}. Analyse these emails and identify recurring subscriptions, memberships, and bundled services.
 
 Return ONLY a valid JSON array — no markdown, no explanation, no code fences.
 
-Schema: { "name": string, "icon": one emoji, "amount": number|null, "mrp": number|null, "cycle": "monthly"|"quarterly"|"half-yearly"|"yearly", "lastPaidDate": "YYYY-MM-DD" or "", "endDate": "YYYY-MM-DD" or "", "category": "Software"|"Streaming"|"Telecom"|"Fitness"|"Lifestyle"|"News"|"Other", "source": "gmail", "bundledVia": "" }
+Schema: { "name": string, "icon": one emoji, "amount": number|null, "mrp": number|null, "cycle": "monthly"|"quarterly"|"half-yearly"|"yearly", "lastPaidDate": "YYYY-MM-DD" or "", "endDate": "YYYY-MM-DD" or "", "category": "Software"|"Streaming"|"Telecom"|"Fitness"|"Lifestyle"|"News"|"Other", "source": "gmail", "bundledVia": "", "confidence": "confirmed"|"inferred" }
 
 Rules:
-- Only recurring subscriptions — ignore one-time purchases, OTPs, shipping, hardware, account alerts
+- Only recurring subscriptions/memberships — ignore one-time purchases, OTPs, shipping, hardware, account alerts
 - Ignore refund, cancellation, failed payment, and chargeback emails
-- "amount": the actual INR amount charged, extracted from the email body (look for ₹, Rs., $, £, € followed by numbers, or lines like "Total", "Amount Due", "Charged"). Set null if no price appears anywhere in the email. NEVER set 0 unless confirmed free/trial.
-- "mrp": the full retail price if the user is getting a discount, else null
-- If the same service appears in multiple emails, output it ONCE using the most recent email's data
+- "confidence": "confirmed" if a payment receipt or explicit charge exists. "inferred" if deduced from an activation/welcome/membership/benefits email with no payment proof.
+- "amount": actual INR amount charged, from email body (look for ₹, Rs., $, £, € with numbers, or "Total", "Amount Due", "Charged"). Set null if price not found anywhere. NEVER set 0 unless explicitly free/trial.
+- "mrp": full retail price if user is getting a discount, else null
+- Same service in multiple emails → output ONCE using most recent email's data
 - Convert USD→INR at 84, GBP→INR at 106, EUR→INR at 90
-- If free because bundled (e.g. Prime with Airtel), set amount=0 and bundledVia to the parent service name
-- "endDate": only if the email explicitly states an expiry/end date. Leave "" otherwise.
-- For insurance policies, the policy period end date is the endDate
-- Consolidate similar service names into one entry (e.g. "Axis Max Life Insurance" and "Axis Max Life Smart Secure Plus Plan" are the same subscription)
+- Bundled services: if a membership email lists included benefits (e.g. Flipkart BLACK listing YouTube Premium; Airtel listing Amazon Prime/Wynk), add each included service as a SEPARATE entry with bundledVia = parent service name, amount = 0, confidence = "inferred"
+- "endDate": set ONLY if the email says "your subscription expires on [date]", "renewal date: [date]", "next billing date: [date]", or "valid until [date]" in direct reference to the user's own subscription — NOT from promotional expiry, T&C, data retention, or unrelated context. If endDate would be more than 2 years from today (${todayISO}), set it to "".
+- For insurance: policy period end date IS the endDate (this is an exception to the 2-year rule)
+- Consolidate similar names into one entry (e.g. "Axis Max Life Insurance" and "Axis Max Life Smart Secure Plus Plan" are the same)
 
 Emails:
 ${JSON.stringify(emails, null, 2)}`;
@@ -1304,12 +1335,20 @@ ${JSON.stringify(emails, null, 2)}`;
 
     let added = 0;
     const dismissed = getDismissed();
+    const now = new Date();
     for (const item of parsed) {
       if (!item.name) continue;
-      // Skip if user previously dismissed this (exact or fuzzy match)
+      // Skip dismissed (exact or fuzzy)
       if (dismissed.some(d => d === item.name.toLowerCase().trim() || isFuzzyDupe(item.name, d))) continue;
-      // Skip if already exists (exact or fuzzy match)
+      // Skip existing duplicates (exact or fuzzy)
       if (subs.some(s => s.name.toLowerCase() === item.name.toLowerCase() || isFuzzyDupe(item.name, s.name))) continue;
+      // Client-side date sanity: endDate > 2 years out is almost certainly wrong (except insurance)
+      if (item.endDate && item.category !== 'Insurance') {
+        const daysOut = (new Date(item.endDate) - now) / 86400000;
+        if (daysOut > 730) item.endDate = '';
+      }
+      // Default confidence to confirmed if not set
+      if (!item.confidence) item.confidence = 'confirmed';
       const sub = { id: uid(), ...item };
       await dbPut(sub);
       subs.push(sub);
