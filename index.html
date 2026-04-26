@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://accounts.google.com/gsi/client" async></script>
 
 <style>
 /* ─── Tokens ────────────────────────────────────────────────────────────── */
@@ -769,11 +770,11 @@ input, select, textarea { font-family: inherit; }
 
 <script>
 /* ────────────────────────────────────────────────────────────────────────
-   CONFIG — Update PROXY_URL after deploying your Cloudflare Worker
+   CONFIG
    ──────────────────────────────────────────────────────────────────────── */
-const PROXY_URL = 'https://subtracker-proxy.yadav-prashant300.workers.dev/v1/messages';
-// ↑ Replace with your actual worker URL after `wrangler deploy`
-// Format: https://<worker-name>.<your-cf-subdomain>.workers.dev/v1/messages
+const PROXY_URL       = 'https://subtracker-proxy.yadav-prashant300.workers.dev/v1/messages';
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+// ↑ Replace with your OAuth 2.0 client ID from Google Cloud Console
 
 /* ────────────────────────────────────────────────────────────────────────
    ICONS
@@ -781,200 +782,10 @@ const PROXY_URL = 'https://subtracker-proxy.yadav-prashant300.workers.dev/v1/mes
 const ICONS = ['🎬','🎵','🎮','📚','💪','☁️','🛒','📰','💼','✈️','🏠','🧘','📺','🧠','🖥️','📡','📱','🎧','🎨','🎨','🤖','⭐','🌳','🏠'];
 
 /* ────────────────────────────────────────────────────────────────────────
-   HARDCODED BAKED-IN SUBSCRIPTIONS  (from prior Gmail scan session)
+   GMAIL SEARCH QUERY  — edit this to change what emails are scanned
    ──────────────────────────────────────────────────────────────────────── */
-const SEED_SUBS = [
-  {
-    id: 'seed-claude-pro',
-    name: 'Claude Pro',
-    icon: '🤖',
-    amount: 1976,      // $23.60 at ~83.7 INR/USD
-    mrp: 0,
-    cycle: 'monthly',
-    lastPaidDate: '2026-04-15',
-    endDate: '2026-05-15',
-    category: 'Software',
-    source: 'seed',
-    bundledVia: '',
-    notes: '$23.60/mo · renews May 15 2026'
-  },
-  {
-    id: 'seed-genspark',
-    name: 'Genspark Plus',
-    icon: '⭐',
-    amount: 2468,      // $29.49
-    mrp: 0,
-    cycle: 'monthly',
-    lastPaidDate: '2026-03-11',
-    endDate: '2026-03-11',
-    category: 'Software',
-    source: 'seed',
-    bundledVia: '',
-    notes: '$29.49/mo · renews Mar 11 2026'
-  },
-  {
-    id: 'seed-apple',
-    name: 'Apple Subscription',
-    icon: '🍎',
-    amount: 0,
-    mrp: 0,
-    cycle: 'monthly',
-    lastPaidDate: '2026-03-18',
-    endDate: '2026-04-18',
-    category: 'Software',
-    source: 'seed',
-    bundledVia: '',
-    notes: 'Monthly · renews ~Apr 18 2026'
-  },
-  {
-    id: 'seed-airtel',
-    name: 'Airtel Postpaid',
-    icon: '📱',
-    amount: 1178,
-    mrp: 0,
-    cycle: 'monthly',
-    lastPaidDate: '2026-04-22',
-    endDate: '2026-05-22',
-    category: 'Telecom',
-    source: 'seed',
-    bundledVia: '',
-    notes: '₹1178/mo · renews ~May 22 2026'
-  },
-  {
-    id: 'seed-maintenance',
-    name: 'Apartment Maintenance',
-    icon: '🏠',
-    amount: 0,
-    mrp: 0,
-    cycle: 'quarterly',
-    lastPaidDate: '2026-01-01',
-    endDate: '2026-04-01',
-    category: 'Lifestyle',
-    source: 'seed',
-    bundledVia: '',
-    notes: 'Golden Star Apt · quarterly'
-  },
-  {
-    id: 'seed-google-one',
-    name: 'Google One 100GB',
-    icon: '☁️',
-    amount: 1300,
-    mrp: 0,
-    cycle: 'yearly',
-    lastPaidDate: '2025-11-23',
-    endDate: '2026-11-23',
-    category: 'Software',
-    source: 'seed',
-    bundledVia: '',
-    notes: '₹1300/yr'
-  },
-  {
-    id: 'seed-accor',
-    name: 'Accor Plus',
-    icon: '✈️',
-    amount: 15000,
-    mrp: 0,
-    cycle: 'yearly',
-    lastPaidDate: '2025-07-16',
-    endDate: '2026-07-16',
-    category: 'Lifestyle',
-    source: 'seed',
-    bundledVia: '',
-    notes: '~₹15000/yr · expires Jul 16 2026'
-  },
-  {
-    id: 'seed-amazon-prime',
-    name: 'Amazon Prime',
-    icon: '📦',
-    amount: 0,
-    mrp: 1499,
-    cycle: 'yearly',
-    lastPaidDate: '',
-    endDate: '',
-    category: 'Streaming',
-    source: 'seed',
-    bundledVia: 'Airtel',
-    notes: 'Free via Airtel Postpaid'
-  },
-  {
-    id: 'seed-linkedin',
-    name: 'LinkedIn Premium Career',
-    icon: '💼',
-    amount: 2650,
-    mrp: 0,
-    cycle: 'monthly',
-    lastPaidDate: '2025-11-11',
-    endDate: '',
-    category: 'Software',
-    source: 'seed',
-    bundledVia: '',
-    notes: '~₹2650/mo · started Nov 11 2025'
-  },
-  {
-    id: 'seed-ps-plus',
-    name: 'PlayStation Plus',
-    icon: '🎮',
-    amount: 499,
-    mrp: 0,
-    cycle: 'monthly',
-    lastPaidDate: '2025-10-09',
-    endDate: '',
-    category: 'Streaming',
-    source: 'seed',
-    bundledVia: '',
-    notes: '~₹499/mo · started Oct 9 2025'
-  },
-  {
-    id: 'seed-cult',
-    name: 'Cult.fit Pro Plus',
-    icon: '💪',
-    amount: 0,
-    mrp: 0,
-    cycle: 'yearly',
-    lastPaidDate: '2025-08-27',
-    endDate: '2026-08-27',
-    category: 'Fitness',
-    source: 'seed',
-    bundledVia: '',
-    notes: 'Yearly · expires Aug 27 2026'
-  },
-  {
-    id: 'seed-flipkart',
-    name: 'Flipkart BLACK',
-    icon: '🛒',
-    amount: 0,
-    mrp: 0,
-    cycle: 'yearly',
-    lastPaidDate: '2026-01-19',
-    endDate: '2027-01-19',
-    category: 'Lifestyle',
-    source: 'seed',
-    bundledVia: '',
-    notes: 'Yearly · expires Jan 19 2027'
-  },
-  {
-    id: 'seed-youtube',
-    name: 'YouTube Premium',
-    icon: '▶️',
-    amount: 0,
-    mrp: 1189,
-    cycle: 'yearly',
-    lastPaidDate: '',
-    endDate: '2027-01-19',
-    category: 'Streaming',
-    source: 'seed',
-    bundledVia: 'Flipkart BLACK',
-    notes: 'Free via Flipkart BLACK · expires Jan 19 2027'
-  },
-];
+const GMAIL_QUERY = 'subject:(receipt OR invoice OR subscription OR renewal OR billing OR "payment confirmation" OR "order confirmation" OR "auto-renew" OR "auto renew") newer_than:365d';
 
-/* ────────────────────────────────────────────────────────────────────────
-   HARDCODED EMAIL ARRAY  (paste Gmail scan data here — no live Gmail needed)
-   ──────────────────────────────────────────────────────────────────────── */
-const EMAILS = [
-  // { subject: '...', from: '...', date: '...', snippet: '...' },
-  // Add your email objects here. The AI will parse them into subscriptions.
-];
 
 /* ────────────────────────────────────────────────────────────────────────
    DB
@@ -1030,6 +841,8 @@ let sortMode = 'date'; // 'date' | 'amount' | 'name'
 let editingId = null;
 let selectedIcon = '⭐';
 let deferredInstall = null;
+let tokenClient = null;
+let gmailAccessToken = null;
 
 /* ────────────────────────────────────────────────────────────────────────
    HELPERS
@@ -1294,44 +1107,93 @@ async function saveSub() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────
-   GMAIL SCAN via Cloudflare Worker proxy
+   GMAIL SCAN — OAuth + live fetch + Gemini analysis
    ──────────────────────────────────────────────────────────────────────── */
-async function scanGmail() {
-  if (EMAILS.length === 0) {
-    showToast('No emails to scan (EMAILS array is empty)');
-    return;
-  }
+function initGoogleAuth() {
+  if (!window.google?.accounts?.oauth2) return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/gmail.readonly',
+    callback: async (response) => {
+      if (response.error) {
+        showToast('Google auth failed: ' + response.error, 4000);
+        document.getElementById('scanBtn').disabled = false;
+        document.getElementById('scanStatus').classList.remove('show');
+        return;
+      }
+      gmailAccessToken = response.access_token;
+      await fetchAndScan();
+    },
+  });
+}
 
+async function fetchGmailEmails() {
+  const statusText = document.getElementById('scanStatusText');
+  statusText.textContent = 'Fetching emails from Gmail…';
+
+  const listRes = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(GMAIL_QUERY)}&maxResults=100`,
+    { headers: { Authorization: `Bearer ${gmailAccessToken}` } }
+  );
+  if (!listRes.ok) throw new Error('Gmail fetch failed — check OAuth scope');
+  const listData = await listRes.json();
+  const messages = listData.messages || [];
+
+  statusText.textContent = `Reading ${Math.min(messages.length, 60)} emails…`;
+
+  const emails = [];
+  for (let i = 0; i < Math.min(messages.length, 60); i += 10) {
+    const batch = messages.slice(i, i + 10);
+    const results = await Promise.all(batch.map(async (msg) => {
+      const r = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+        { headers: { Authorization: `Bearer ${gmailAccessToken}` } }
+      );
+      const data = await r.json();
+      const headers = data.payload?.headers || [];
+      const get = (name) => headers.find(h => h.name === name)?.value || '';
+      return { subject: get('Subject'), from: get('From'), date: get('Date'), snippet: data.snippet || '' };
+    }));
+    emails.push(...results);
+  }
+  return emails;
+}
+
+async function fetchAndScan() {
   const status = document.getElementById('scanStatus');
   const statusText = document.getElementById('scanStatusText');
   const scanBtn = document.getElementById('scanBtn');
 
-  status.classList.add('show');
-  statusText.textContent = 'Scanning emails…';
-  scanBtn.disabled = true;
+  try {
+    const emails = await fetchGmailEmails();
+    statusText.textContent = 'Analysing with AI…';
 
-  const prompt = `You are a subscription detector. Analyse these email objects and identify any recurring subscriptions, memberships or services.
+    const prompt = `You are a subscription detector. Analyse these email objects and identify recurring subscriptions, memberships, or services the user pays for.
 
 Return ONLY a valid JSON array — no markdown, no explanation, no code fences.
 
-Each item: { "name": string, "icon": one emoji, "amount": number (INR, 0 if free), "mrp": number (0 if unknown), "cycle": "monthly"|"quarterly"|"half-yearly"|"yearly", "lastPaidDate": "YYYY-MM-DD" or "", "endDate": "YYYY-MM-DD" or "", "category": "Software"|"Streaming"|"Telecom"|"Fitness"|"Lifestyle"|"News"|"Other", "source": "gmail", "bundledVia": "" }
+Each item must match this schema exactly:
+{ "name": string, "icon": one emoji, "amount": number (INR, 0 if free/unknown), "mrp": number (full price if discounted, else 0), "cycle": "monthly"|"quarterly"|"half-yearly"|"yearly", "lastPaidDate": "YYYY-MM-DD" or "", "endDate": "YYYY-MM-DD" or "", "category": "Software"|"Streaming"|"Telecom"|"Fitness"|"Lifestyle"|"News"|"Other", "source": "gmail", "bundledVia": "" }
+
+Rules:
+- Only include recurring subscriptions — ignore one-time purchases, shipping, hardware
+- Ignore refund, cancellation, failed payment, and chargeback emails
+- If the same service appears in multiple emails, output it once using the most recent email's data
+- Convert USD→INR at 84, GBP→INR at 106, EUR→INR at 90
+- If a service is free because it is bundled with another (e.g. Prime via Airtel), set amount=0 and bundledVia to the parent service
+- Trials count as subscriptions; set amount to the trial price (0 if free trial)
+- If cycle is ambiguous, infer from the amount and service type
 
 Emails:
-${JSON.stringify(EMAILS.slice(0, 40), null, 2)}`;
+${JSON.stringify(emails, null, 2)}`;
 
-  try {
     const r = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
 
-    if (!r.ok) {
-      const err = await r.text();
-      throw new Error(`Worker error ${r.status}: ${err}`);
-    }
+    if (!r.ok) throw new Error(`Worker error ${r.status}: ${await r.text()}`);
 
     const data = await r.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
@@ -1349,7 +1211,7 @@ ${JSON.stringify(EMAILS.slice(0, 40), null, 2)}`;
       added++;
     }
     render();
-    showToast(added > 0 ? `Found ${added} new subscription${added>1?'s':''}` : 'No new subscriptions found');
+    showToast(added > 0 ? `Found ${added} new subscription${added > 1 ? 's' : ''}` : 'No new subscriptions found');
   } catch (e) {
     console.error(e);
     showToast('Scan failed: ' + e.message, 4000);
@@ -1357,6 +1219,17 @@ ${JSON.stringify(EMAILS.slice(0, 40), null, 2)}`;
     status.classList.remove('show');
     scanBtn.disabled = false;
   }
+}
+
+function scanGmail() {
+  if (!tokenClient) {
+    showToast('Google auth not initialised — check Client ID', 4000);
+    return;
+  }
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('scanStatus').classList.add('show');
+  document.getElementById('scanStatusText').textContent = 'Connecting to Gmail…';
+  tokenClient.requestAccessToken({ prompt: gmailAccessToken ? '' : 'consent' });
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -1449,30 +1322,23 @@ document.getElementById('installSkip').addEventListener('click', () => document.
    ──────────────────────────────────────────────────────────────────────── */
 (async () => {
   db = await openDB();
-
-  // Load from DB
-  const stored = await dbGetAll();
-  const storedIds = new Set(stored.map(s => s.id));
-
-  // Seed missing pre-loaded subs
-  for (const seed of SEED_SUBS) {
-    if (!storedIds.has(seed.id)) {
-      await dbPut(seed);
-      stored.push(seed);
-    }
-  }
-  subs = stored;
-
+  subs = await dbGetAll();
   render();
 
-  // Notification bar
   if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
     document.getElementById('notifBar').classList.remove('hidden');
   }
 
-  // Service worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/Subscription-Tracker/sw.js').catch(console.warn);
+  }
+
+  // Init Google OAuth — works whether GIS script loaded before or after this runs
+  if (window.google?.accounts?.oauth2) {
+    initGoogleAuth();
+  } else {
+    document.querySelector('script[src*="accounts.google.com"]')
+      ?.addEventListener('load', initGoogleAuth);
   }
 })();
 </script>
